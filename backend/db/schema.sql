@@ -1,0 +1,27 @@
+-- Base de datos para Protección Civil Carabobo (ejecutar en MySQL / XAMPP)
+CREATE DATABASE IF NOT EXISTS proteccion_civil_carabobo CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+USE proteccion_civil_carabobo;
+
+CREATE TABLE IF NOT EXISTS incidentes (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  tipo VARCHAR(80) NOT NULL,
+  tipo_nombre VARCHAR(255) NOT NULL,
+  categoria VARCHAR(50) NOT NULL DEFAULT 'otro',
+  descripcion TEXT,
+  lat DECIMAL(10, 6) NOT NULL,
+  lng DECIMAL(10, 6) NOT NULL,
+  municipio VARCHAR(80) DEFAULT NULL,
+  fecha DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS usuarios (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  nombre VARCHAR(100) NOT NULL,
+  apellido VARCHAR(100) NOT NULL,
+  correo VARCHAR(255) NOT NULL UNIQUE,
+  cedula VARCHAR(20) NOT NULL UNIQUE,
+  telefono VARCHAR(20) NOT NULL,
+  password_hash VARCHAR(255) NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
