@@ -1,7 +1,3 @@
-/**
- * Cliente API de incidentes (backend Node.js).
- * Sustituye el uso de localStorage.
- */
 import axios from 'axios'
 import { TIPOS_INCIDENTE, MUNICIPIOS_CARABOBO } from '../config/incidentes'
 
@@ -12,23 +8,26 @@ const api = axios.create({
   headers: { 'Content-Type': 'application/json' },
 })
 
-/**
- * Obtiene todos los incidentes (para mapa, listado y reportes).
- * Si el servidor no responde, devuelve array vacío.
- */
-export async function obtenerIncidentes() {
+function coordONull(v) {
+  if (v == null || v === '') return null
+  const n = Number(v)
+  return Number.isFinite(n) ? n : null
+}
+
+export async function obtenerIncidentes(options = {}) {
   try {
-    const { data } = await api.get('/api/incidentes')
+    const params = {}
+    if (options.soloAbiertos === true) {
+      params.solo_abiertos = '1'
+    }
+    const { data } = await api.get('/api/incidentes', { params })
     return data
-  } catch (err) {
-    console.error('Error al obtener incidentes:', err.message)
+  } catch (e) {
+    console.error('Error al obtener incidentes:', e.message)
     return []
   }
 }
 
-/**
- * Guarda un nuevo incidente en el servidor.
- */
 export async function guardarIncidente(datos) {
   const tipoInfo = TIPOS_INCIDENTE.find((t) => t.id === datos.tipo) || { nombre: datos.tipo, categoria: 'otro' }
   const payload = {
@@ -36,18 +35,17 @@ export async function guardarIncidente(datos) {
     tipo_nombre: tipoInfo.nombre,
     categoria: tipoInfo.categoria,
     descripcion: datos.descripcion || '',
-    lat: datos.lat,
-    lng: datos.lng,
+    lat: coordONull(datos.lat),
+    lng: coordONull(datos.lng),
     municipio: datos.municipio || '',
+    parroquia: datos.parroquia || '',
+    via: datos.via != null ? String(datos.via) : '',
     fecha: datos.fecha || new Date().toISOString(),
   }
   const { data } = await api.post('/api/incidentes', payload)
   return data
 }
 
-/**
- * Actualiza un incidente existente.
- */
 export async function actualizarIncidente(id, datos) {
   const tipoInfo = TIPOS_INCIDENTE.find((t) => t.id === datos.tipo) || { nombre: datos.tipo, categoria: 'otro' }
   const payload = {
@@ -55,12 +53,23 @@ export async function actualizarIncidente(id, datos) {
     tipo_nombre: tipoInfo.nombre,
     categoria: tipoInfo.categoria,
     descripcion: datos.descripcion || '',
-    lat: datos.lat,
-    lng: datos.lng,
+    lat: coordONull(datos.lat),
+    lng: coordONull(datos.lng),
     municipio: datos.municipio || '',
-    fecha: datos.fecha || new Date().toISOString(),
+    parroquia: datos.parroquia || '',
+    via: datos.via != null ? String(datos.via) : '',
   }
   const { data } = await api.put(`/api/incidentes/${id}`, payload)
+  return data
+}
+
+export async function cerrarIncidente(id) {
+  const { data } = await api.patch(`/api/incidentes/${id}/cerrar`)
+  return data
+}
+
+export async function actualizarEstadoIncidente(id, estado) {
+  const { data } = await api.patch(`/api/incidentes/${id}/estado`, { estado })
   return data
 }
 

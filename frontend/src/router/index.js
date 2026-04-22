@@ -27,10 +27,16 @@ const routes = [
     meta: { title: 'Listado de Incidentes', requiresAuth: true },
   },
   {
+    path: '/dashboard',
+    name: 'Dashboard',
+    component: () => import('../views/DashboardView.vue'),
+    meta: { title: 'Dashboard', requiresAuth: true },
+  },
+  {
     path: '/reportes',
     name: 'Reportes',
-    component: () => import('../views/ReportesView.vue'),
-    meta: { title: 'Reportes y Estadísticas', requiresAuth: true },
+    component: () => import('../views/ReportesListaView.vue'),
+    meta: { title: 'Reportes', requiresAuth: true },
   },
   {
     path: '/login',

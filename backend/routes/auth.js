@@ -37,7 +37,6 @@ function validarRegistro(body) {
   return errores
 }
 
-/** POST /api/auth/registro */
 router.post('/registro', async (req, res) => {
   try {
     const errores = validarRegistro(req.body)
@@ -73,7 +72,6 @@ router.post('/registro', async (req, res) => {
   }
 })
 
-/** POST /api/auth/login */
 router.post('/login', async (req, res) => {
   try {
     const { correo, password } = req.body

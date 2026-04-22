@@ -1,18 +1,29 @@
-/* Protección Civil Carabobo - Estilos globales */
+/* Colores principales del sitio */
 :root {
-  --color-primary: #c41e3a;
-  --color-primary-dark: #9a1830;
-  --color-primary-light: #e63950;
-  --color-secondary: #1a365d;
-  --color-accent: #f59e0b;
-  --color-success: #059669;
-  --color-surface: #f8fafc;
-  --color-surface-card: #ffffff;
-  --color-text: #1e293b;
-  --color-text-muted: #64748b;
+  --color-burgundy: #800000;
+  --color-burgundy-dark: #5c0000;
+  --color-burgundy-light: #a01010;
+  --color-royal-blue: #0033CC;
+  --color-royal-blue-dark: #002699;
+  --color-royal-blue-light: #1a47d4;
+  --color-orange: #FF8000;
+  --color-orange-dark: #e67300;
+  --color-white: #f2f6fb;
+  --color-outline: #101010;
+
+  --color-primary: var(--color-burgundy);
+  --color-primary-dark: var(--color-burgundy-dark);
+  --color-primary-light: var(--color-burgundy-light);
+  --color-secondary: var(--color-royal-blue);
+  --color-accent: var(--color-orange);
+  --color-success: #0d7a4a;
+  --color-surface: #dde5ef;
+  --color-surface-card: #edf3f9;
+  --color-text: var(--color-outline);
+  --color-text-muted: #4a4a55;
   --font-sans: 'Segoe UI', system-ui, -apple-system, sans-serif;
-  --shadow: 0 1px 3px rgba(0,0,0,0.08);
-  --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -2px rgba(0,0,0,0.1);
+  --shadow: 0 1px 3px rgba(16, 16, 16, 0.08);
+  --shadow-md: 0 4px 12px rgba(0, 51, 204, 0.12), 0 2px 4px rgba(16, 16, 16, 0.08);
   --radius: 8px;
   --radius-lg: 12px;
 }
@@ -28,6 +39,8 @@
 html {
   font-size: 16px;
   -webkit-font-smoothing: antialiased;
+  height: 100%;
+  overflow: hidden;
 }
 
 body {
@@ -35,13 +48,21 @@ body {
   color: var(--color-text);
   background: var(--color-surface);
   line-height: 1.5;
+  height: 100%;
+  overflow: hidden;
+}
+
+#app {
+  height: 100%;
+  overflow: hidden;
 }
 
 a {
-  color: var(--color-primary);
+  color: var(--color-royal-blue);
   text-decoration: none;
 }
 a:hover {
+  color: var(--color-burgundy);
   text-decoration: underline;
 }
 
@@ -63,24 +84,25 @@ a:hover {
   transform: scale(0.98);
 }
 .btn-primary {
-  background: var(--color-primary);
-  color: white;
+  background: var(--color-burgundy);
+  color: var(--color-white);
 }
 .btn-primary:hover {
-  background: var(--color-primary-dark);
+  background: var(--color-burgundy-dark);
 }
 .btn-secondary {
-  background: var(--color-secondary);
-  color: white;
+  background: var(--color-royal-blue);
+  color: var(--color-white);
 }
 .btn-secondary:hover {
-  background: #2d4a7c;
+  background: var(--color-royal-blue-dark);
 }
 
 .card {
   background: var(--color-surface-card);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow);
+  border: 1px solid rgba(16, 16, 16, 0.06);
   padding: 1.5rem;
 }
 
@@ -88,14 +110,15 @@ a:hover {
   width: 100%;
   padding: 0.625rem 0.875rem;
   font-size: 1rem;
-  border: 1px solid #e2e8f0;
+  border: 1px solid rgba(16, 16, 16, 0.15);
   border-radius: var(--radius);
-  background: white;
+  background: var(--color-white);
+  color: var(--color-text);
 }
 .input:focus {
   outline: none;
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px rgba(196, 30, 58, 0.15);
+  border-color: var(--color-royal-blue);
+  box-shadow: 0 0 0 3px rgba(0, 51, 204, 0.18);
 }
 
 label {
@@ -112,11 +135,11 @@ label {
 .page-title {
   font-size: 1.5rem;
   font-weight: 700;
-  color: var(--color-secondary);
+  color: var(--color-royal-blue);
   margin-bottom: 1rem;
 }
 
-/* Leaflet popup: contenido dentro del recuadro, por más largo que sea */
+/* Leaflet popup */
 .leaflet-popup-content-wrapper {
   border-radius: var(--radius);
   box-shadow: var(--shadow-md);

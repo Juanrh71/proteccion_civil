@@ -1,0 +1,25 @@
+# Dependencias
+node_modules/
+**/node_modules/
+
+# Build / caché
+frontend/dist/
+**/dist/
+frontend/.vite/
+.vite/
+
+# Entorno (contraseñas, claves)
+.env
+.env.*
+!.env.example
+
+# Logs y sistema
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db
+
+# IDE (opcional)
+.idea/
+*.swp
+*.swo

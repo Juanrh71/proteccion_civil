@@ -1,6 +1,3 @@
-/**
- * Composable de autenticación: estado reactivo, login, registro, logout.
- */
 import { ref, computed } from 'vue'
 import * as authApi from '../api/auth'
 
@@ -10,14 +7,10 @@ const usuario = ref(authApi.getUsuario())
 export function useAuth() {
   const estaAutenticado = computed(() => !!token.value)
 
-  function setAuthState(newToken, newUsuario) {
-    token.value = newToken
-    usuario.value = newUsuario
-  }
-
   async function login(correo, password) {
     const data = await authApi.login(correo, password)
-    setAuthState(authApi.getToken(), authApi.getUsuario())
+    token.value = authApi.getToken()
+    usuario.value = authApi.getUsuario()
     return data
   }
 
@@ -27,7 +20,8 @@ export function useAuth() {
 
   function logout() {
     authApi.logout()
-    setAuthState(null, null)
+    token.value = null
+    usuario.value = null
   }
 
   function initFromStorage() {

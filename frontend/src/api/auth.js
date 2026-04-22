@@ -1,6 +1,3 @@
-/**
- * Cliente API de autenticación (registro, login, logout).
- */
 import axios from 'axios'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000'
@@ -21,7 +18,7 @@ export function getUsuario() {
   try {
     const raw = localStorage.getItem(USER_KEY)
     return raw ? JSON.parse(raw) : null
-  } catch {
+  } catch (e) {
     return null
   }
 }
@@ -36,19 +33,11 @@ export function clearAuth() {
   localStorage.removeItem(USER_KEY)
 }
 
-/**
- * Registro de usuario.
- * @param {Object} datos - { nombre, apellido, correo, cedula, telefono, password, confirmacion }
- */
 export async function registro(datos) {
   const { data } = await api.post('/api/auth/registro', datos)
   return data
 }
 
-/**
- * Login. Guarda token y usuario en localStorage.
- * @returns {Object} { token, usuario }
- */
 export async function login(correo, password) {
   const { data } = await api.post('/api/auth/login', { correo, password })
   if (data.token) {
@@ -57,9 +46,6 @@ export async function login(correo, password) {
   return data
 }
 
-/**
- * Cierra sesión (borra token y usuario en memoria y localStorage).
- */
 export function logout() {
   clearAuth()
 }

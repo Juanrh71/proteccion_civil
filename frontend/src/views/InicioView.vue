@@ -1,27 +1,29 @@
 <template>
   <div class="inicio">
+    <div class="inicio-logo-wrap">
+    </div>
     <h1 class="page-title">Gestión de Incidentes</h1>
 
     <div class="grid-cards">
       <router-link to="/mapa" class="card card-link">
         <span class="card-icon"></span>
-        <h2>Mapa Geoespacial</h2>
-        <p>Visualice los incidentes en el mapa del estado Carabobo y analice zonas de mayor incidencia.</p>
+        <h2>Mapa en vivo</h2>
       </router-link>
       <router-link to="/registrar" class="card card-link">
         <span class="card-icon"></span>
         <h2>Registrar Incidente</h2>
-        <p>Registre un nuevo incidente con la clasificación oficial (emergente / no emergente), ubicación y detalles.</p>
       </router-link>
       <router-link to="/incidentes" class="card card-link">
         <span class="card-icon"></span>
         <h2>Listado de Incidentes</h2>
-        <p>Consulte el listado de incidentes registrados con filtros y búsqueda.</p>
+      </router-link>
+      <router-link to="/dashboard" class="card card-link">
+        <span class="card-icon"></span>
+        <h2>Dashboard</h2>
       </router-link>
       <router-link to="/reportes" class="card card-link">
         <span class="card-icon"></span>
-        <h2>Reportes y Estadísticas</h2>
-        <p>Estadísticas por tipo de incidente, municipio y categoría para la toma de decisiones.</p>
+        <h2>Reportes</h2>
       </router-link>
     </div>
   </div>
@@ -33,6 +35,20 @@
 <style scoped>
 .inicio {
   max-width: 900px;
+}
+.inicio-logo-wrap {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 0.75rem;
+}
+.inicio-logo {
+  display: block;
+  width: 100px;
+  height: 100px;
+  object-fit: contain;
+  border-radius: 50%;
+  box-shadow: 0 4px 16px rgba(0, 51, 204, 0.15);
+  border: 3px solid rgba(255, 128, 0, 0.35);
 }
 .grid-cards {
   display: grid;
@@ -48,6 +64,7 @@
 .card-link:hover {
   transform: translateY(-2px);
   box-shadow: var(--shadow-md);
+  border-color: rgba(255, 128, 0, 0.35);
   text-decoration: none;
   color: inherit;
 }
@@ -59,7 +76,7 @@
 .card-link h2 {
   font-size: 1.125rem;
   font-weight: 600;
-  color: var(--color-secondary);
+  color: var(--color-royal-blue);
   margin-bottom: 0.5rem;
 }
 .card-link p {

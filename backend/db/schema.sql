@@ -8,10 +8,14 @@ CREATE TABLE IF NOT EXISTS incidentes (
   tipo_nombre VARCHAR(255) NOT NULL,
   categoria VARCHAR(50) NOT NULL DEFAULT 'otro',
   descripcion TEXT,
-  lat DECIMAL(10, 6) NOT NULL,
-  lng DECIMAL(10, 6) NOT NULL,
+  lat DECIMAL(10, 6) DEFAULT NULL,
+  lng DECIMAL(10, 6) DEFAULT NULL,
   municipio VARCHAR(80) DEFAULT NULL,
+  parroquia VARCHAR(80) DEFAULT NULL,
+  via VARCHAR(500) DEFAULT NULL COMMENT 'calle, avenida o referencia',
   fecha DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  cerrado TINYINT(1) NOT NULL DEFAULT 0 COMMENT '1 = cerrado (sincronizado con estado=cerrado)',
+  estado VARCHAR(20) NOT NULL DEFAULT 'abierto' COMMENT 'abierto | en_proceso | cerrado',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

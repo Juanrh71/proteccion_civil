@@ -2,15 +2,16 @@
   <header class="header">
     <div class="header-inner">
       <router-link to="/" class="logo">
-        <span class="logo-icon"></span>
+        <img src="/imagenes/logo.png" alt="Protección Civil y Administración de Desastres" class="logo-img" width="52" height="52" />
         <span class="logo-text">Protección Civil Carabobo</span>
       </router-link>
       <nav class="nav">
         <template v-if="estaAutenticado">
           <router-link to="/" class="nav-link">Inicio</router-link>
-          <router-link to="/mapa" class="nav-link">Mapa</router-link>
+          <router-link to="/mapa" class="nav-link">Mapa en vivo</router-link>
           <router-link to="/registrar" class="nav-link">Registrar</router-link>
           <router-link to="/incidentes" class="nav-link">Incidentes</router-link>
+          <router-link to="/dashboard" class="nav-link">Dashboard</router-link>
           <router-link to="/reportes" class="nav-link">Reportes</router-link>
           <span class="nav-user">{{ nombreUsuario }}</span>
           <button type="button" class="btn-logout" @click="cerrarSesion">Cerrar sesión</button>
@@ -35,8 +36,8 @@ const { usuario, estaAutenticado, logout } = useAuth()
 const nombreUsuario = computed(() => {
   const u = usuario.value
   if (!u) return ''
-  if (u.nombre && u.apellido) return `${u.nombre} ${u.apellido}`.trim()
-  return u.correo || ''
+  if (u.nombre && u.apellido) return u.nombre + ' ' + u.apellido
+  return u.correo ? u.correo : ''
 })
 
 function cerrarSesion() {
@@ -47,9 +48,10 @@ function cerrarSesion() {
 
 <style scoped>
 .header {
-  background: var(--color-secondary);
-  color: white;
+  background: var(--color-royal-blue);
+  color: var(--color-white);
   box-shadow: var(--shadow-md);
+  border-bottom: 3px solid var(--color-orange);
 }
 .header-inner {
   max-width: 1400px;
@@ -64,18 +66,28 @@ function cerrarSesion() {
 .logo {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  color: white;
+  gap: 0.625rem;
+  color: var(--color-white);
   text-decoration: none;
   font-weight: 700;
   font-size: 1.125rem;
 }
 .logo:hover {
   text-decoration: none;
-  opacity: 0.9;
+  opacity: 0.95;
 }
-.logo-icon {
-  font-size: 1.5rem;
+.logo-img {
+  display: block;
+  flex-shrink: 0;
+  width: 52px;
+  height: 52px;
+  object-fit: contain;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+.logo-text {
+  text-shadow: 0 1px 2px rgba(16, 16, 16, 0.2);
 }
 .nav {
   display: flex;
@@ -83,7 +95,7 @@ function cerrarSesion() {
   flex-wrap: wrap;
 }
 .nav-link {
-  color: rgba(255,255,255,0.9);
+  color: rgba(255, 255, 255, 0.92);
   text-decoration: none;
   padding: 0.5rem 0.75rem;
   border-radius: var(--radius);
@@ -91,13 +103,14 @@ function cerrarSesion() {
   font-size: 0.9375rem;
 }
 .nav-link:hover {
-  background: rgba(255,255,255,0.1);
-  color: white;
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--color-white);
   text-decoration: none;
 }
 .nav-link.router-link-active {
-  background: var(--color-primary);
-  color: white;
+  background: var(--color-burgundy);
+  color: var(--color-white);
+  box-shadow: 0 2px 0 var(--color-orange);
 }
 .nav-user {
   color: rgba(255,255,255,0.95);

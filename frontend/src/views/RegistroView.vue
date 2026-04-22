@@ -1,8 +1,10 @@
 <template>
   <div class="auth-page">
     <div class="auth-view auth-view-compact">
+      <div class="auth-logo-wrap">
+        <img src="/imagenes/logo.png" alt="Protección Civil y Administración de Desastres" class="auth-logo" width="96" height="96" />
+      </div>
       <h1 class="page-title">Registrarse</h1>
-      <p class="subtitle">Cree una cuenta con sus datos personales.</p>
 
       <form @submit.prevent="enviar" class="form-auth card" autocomplete="off">
       <div class="form-row form-row-tight">
@@ -76,9 +78,13 @@
 import { ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuth } from '../composables/useAuth'
-import { PREFIJOS_CEDULA, CODIGOS_TELEFONO_VENEZUELA } from '../config/authForm'
 
-const CODIGOS_TELEFONO = CODIGOS_TELEFONO_VENEZUELA
+const PREFIJOS_CEDULA = [
+  { value: 'V', label: 'V' },
+  { value: 'J', label: 'J' },
+  { value: 'E', label: 'E' },
+]
+const CODIGOS_TELEFONO = ['0412', '0414', '0416', '0422', '0424', '0426']
 
 const router = useRouter()
 const { registro } = useAuth()
@@ -108,11 +114,7 @@ const mensajeOk = ref(false)
 const enviando = ref(false)
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-const onlyNumbers = /^\d+$/
-const CEDULA_NUMERO_MIN = 6
-const CEDULA_NUMERO_MAX = 9
-const TELEFONO_NUMERO_LEN = 6
-const MIN_PASSWORD = 6
+const soloDigitos = /^\d+$/
 
 function validar() {
   const f = form.value
@@ -148,11 +150,11 @@ function validar() {
   if (!cedulaNum) {
     errores.cedula = 'Ingrese el número de cédula.'
     ok = false
-  } else if (!onlyNumbers.test(cedulaNum)) {
+  } else if (!soloDigitos.test(cedulaNum)) {
     errores.cedula = 'El número de cédula debe contener solo dígitos.'
     ok = false
-  } else if (cedulaNum.length < CEDULA_NUMERO_MIN || cedulaNum.length > CEDULA_NUMERO_MAX) {
-    errores.cedula = `El número debe tener entre ${CEDULA_NUMERO_MIN} y ${CEDULA_NUMERO_MAX} dígitos.`
+  } else if (cedulaNum.length < 6 || cedulaNum.length > 9) {
+    errores.cedula = 'El número debe tener entre 6 y 9 dígitos.'
     ok = false
   }
   if (!f.telefonoPrefijo) {
@@ -163,18 +165,18 @@ function validar() {
   if (!telefonoNum) {
     errores.telefono = 'Ingrese el número de teléfono.'
     ok = false
-  } else if (!onlyNumbers.test(telefonoNum)) {
+  } else if (!soloDigitos.test(telefonoNum)) {
     errores.telefono = 'El número debe contener solo dígitos.'
     ok = false
-  } else if (telefonoNum.length !== TELEFONO_NUMERO_LEN) {
-    errores.telefono = `El número debe tener ${TELEFONO_NUMERO_LEN} dígitos.`
+  } else if (telefonoNum.length !== 6) {
+    errores.telefono = 'El número debe tener 6 dígitos.'
     ok = false
   }
   if (!f.password) {
     errores.password = 'La contraseña es requerida.'
     ok = false
-  } else if (f.password.length < MIN_PASSWORD) {
-    errores.password = `La contraseña debe tener al menos ${MIN_PASSWORD} caracteres.`
+  } else if (f.password.length < 6) {
+    errores.password = 'La contraseña debe tener al menos 6 caracteres.'
     ok = false
   }
   if (f.confirmacion !== f.password) {
@@ -205,7 +207,11 @@ async function enviar() {
     setTimeout(() => router.push('/login'), 1500)
   } catch (e) {
     mensajeOk.value = false
-    mensajeGlobal.value = e.response?.data?.error || 'Error al registrarse. Intente de nuevo.'
+    let msg = 'Error al registrarse. Intente de nuevo.'
+    if (e.response && e.response.data && e.response.data.error) {
+      msg = e.response.data.error
+    }
+    mensajeGlobal.value = msg
   }
   enviando.value = false
 }
@@ -219,13 +225,27 @@ async function enviar() {
   min-height: calc(100vh - 120px);
   padding: 0.5rem;
 }
+.auth-logo-wrap {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 0.35rem;
+}
+.auth-logo {
+  display: block;
+  width: 96px;
+  height: 96px;
+  object-fit: contain;
+  border-radius: 50%;
+  box-shadow: 0 4px 14px rgba(0, 51, 204, 0.18);
+  border: 2px solid rgba(255, 128, 0, 0.4);
+}
 .auth-view-compact .page-title {
-  font-size: 1.25rem;
+  font-size: 1.5rem;
   margin-bottom: 0.25rem;
   text-align: center;
 }
 .auth-view-compact .subtitle {
-  font-size: 0.8125rem;
+  font-size: 1rem;
   margin-bottom: 0.75rem;
   text-align: center;
   color: var(--color-text-muted);
@@ -247,12 +267,12 @@ async function enviar() {
   margin-bottom: 0.5rem;
 }
 .form-group-small label {
-  font-size: 0.75rem;
+  font-size: 0.9375rem;
   margin-bottom: 0.2rem;
 }
 .input-small {
-  padding: 0.35rem 0.5rem;
-  font-size: 0.8125rem;
+  padding: 0.625rem 0.875rem;
+  font-size: 0.9375rem;
 }
 .cedula-row,
 .telefono-row {
@@ -262,8 +282,8 @@ async function enviar() {
 .input-prefijo {
   flex: 0 0 auto;
   width: 3.5rem;
-  padding: 0.35rem 0.25rem;
-  font-size: 0.8125rem;
+  padding: 0.5rem 0.35rem;
+  font-size: 0.9375rem;
 }
 .cedula-row .input-prefijo {
   width: 2.75rem;
@@ -273,7 +293,7 @@ async function enviar() {
   min-width: 0;
 }
 .field-error {
-  font-size: 0.7rem;
+  font-size: 0.875rem;
   color: var(--color-primary);
   margin-top: 0.15rem;
 }
@@ -281,12 +301,12 @@ async function enviar() {
   margin-top: 0.5rem;
 }
 .btn-small {
-  padding: 0.4rem 0.75rem;
-  font-size: 0.8125rem;
+  padding: 0.75rem;
+  font-size: 0.9375rem;
 }
 .msg {
   margin-top: 0.5rem;
-  font-size: 0.8125rem;
+  font-size: 0.9375rem;
   text-align: center;
 }
 .msg.ok {
@@ -297,13 +317,16 @@ async function enviar() {
 }
 .auth-link {
   margin-top: 0.5rem;
-  font-size: 0.8125rem;
+  font-size: 0.9375rem;
   color: var(--color-text-muted);
   text-align: center;
 }
 .auth-link a {
-  color: var(--color-secondary);
+  color: var(--color-royal-blue);
   font-weight: 600;
+}
+.auth-link a:hover {
+  color: var(--color-burgundy);
 }
 @media (max-width: 480px) {
   .form-row-tight {

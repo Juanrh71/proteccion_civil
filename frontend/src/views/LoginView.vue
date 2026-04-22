@@ -1,12 +1,14 @@
 <template>
   <div class="auth-page">
     <div class="auth-view">
+      <div class="auth-logo-wrap">
+        <img src="/imagenes/logo.png" alt="Protección Civil y Administración de Desastres" class="auth-logo" width="120" height="120" />
+      </div>
       <h1 class="page-title">Iniciar sesión</h1>
-      <p class="subtitle">Ingrese su correo y contraseña para acceder.</p>
 
       <form @submit.prevent="enviar" class="form-auth card" autocomplete="off">
         <div class="form-group">
-          <label>Correo electrónico *</label>
+          <label>Correo electrónico</label>
           <input
             v-model="form.correo"
             type="email"
@@ -16,7 +18,7 @@
           <p v-if="errores.correo" class="field-error">{{ errores.correo }}</p>
         </div>
         <div class="form-group">
-          <label>Contraseña *</label>
+          <label>Contraseña</label>
           <input
             v-model="form.password"
             type="password"
@@ -80,7 +82,11 @@ async function enviar() {
     await login(form.value.correo, form.value.password)
     router.push('/')
   } catch (e) {
-    mensajeGlobal.value = e.response?.data?.error || 'Credenciales incorrectas.'
+    let msg = 'Credenciales incorrectas.'
+    if (e.response && e.response.data && e.response.data.error) {
+      msg = e.response.data.error
+    }
+    mensajeGlobal.value = msg
   }
   enviando.value = false
 }
@@ -98,6 +104,20 @@ async function enviar() {
   width: 100%;
   max-width: 420px;
   margin: 0 auto;
+}
+.auth-logo-wrap {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 0.75rem;
+}
+.auth-logo {
+  display: block;
+  width: 120px;
+  height: 120px;
+  object-fit: contain;
+  border-radius: 50%;
+  box-shadow: 0 4px 16px rgba(0, 51, 204, 0.2);
+  border: 3px solid rgba(255, 128, 0, 0.45);
 }
 .auth-view .page-title {
   text-align: center;
@@ -138,7 +158,10 @@ async function enviar() {
   text-align: center;
 }
 .auth-link a {
-  color: var(--color-secondary);
+  color: var(--color-royal-blue);
   font-weight: 600;
+}
+.auth-link a:hover {
+  color: var(--color-burgundy);
 }
 </style>
