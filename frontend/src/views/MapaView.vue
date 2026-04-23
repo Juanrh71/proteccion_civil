@@ -13,7 +13,13 @@
       <MapaCarabobo :incidentes="incidentes" mostrar-buscador />
     </div>
     <div class="leyenda card">
-      
+      <h3>Leyenda por categoría</h3>
+      <div class="leyenda-items">
+        <span v-for="cat in categoriasLeyenda" :key="cat.id" class="leyenda-item">
+          <i :style="{ background: cat.color }" />
+          {{ cat.nombre }}
+        </span>
+      </div>
     </div>
   </div>
 </template>
@@ -22,6 +28,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import MapaCarabobo from '../components/MapaCarabobo.vue'
 import { obtenerIncidentes } from '../api/incidentes'
+import { LEYENDA_GRUPOS_EXCEL } from '../utils/clasificacionExcelIncidentes.js'
 
 const incidentes = ref([])
 const actualizando = ref(false)
@@ -35,6 +42,8 @@ const ultimaActualizacionTexto = computed(() => {
   if (!u) return '—'
   return u.toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
 })
+
+const categoriasLeyenda = computed(() => LEYENDA_GRUPOS_EXCEL)
 
 async function refrescar() {
   actualizando.value = true
@@ -66,7 +75,7 @@ onUnmounted(() => {
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 0.55rem;
   overflow: hidden;
 }
 .estado-bar {
@@ -74,7 +83,7 @@ onUnmounted(() => {
   flex-wrap: wrap;
   align-items: center;
   gap: 1rem 1.25rem;
-  padding: 0.875rem 1rem;
+  padding: 0.7rem 0.9rem;
 }
 .activas {
   font-size: 0.9375rem;
@@ -88,11 +97,11 @@ onUnmounted(() => {
   color: var(--color-text-muted);
 }
 .mapa-box {
-  padding: 0.5rem;
+  padding: 0.4rem;
   overflow: hidden;
   flex: 1;
-  min-height: 320px;
-  max-height: 520px;
+  min-height: 260px;
+  max-height: 430px;
   border-radius: 14px;
 }
 .mapa-box :deep(.mapa-wrapper),
@@ -101,31 +110,38 @@ onUnmounted(() => {
   border-radius: 10px;
 }
 .leyenda {
-  padding: 0.875rem 1rem;
+  padding: 0.65rem 0.85rem;
 }
 .leyenda h3 {
   font-size: 0.9375rem;
   font-weight: 600;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.45rem;
   color: var(--color-secondary);
 }
 .leyenda-items {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem 0.875rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 0.35rem 0.85rem;
+  max-height: 160px;
+  overflow-y: auto;
+  padding-right: 0.2rem;
 }
 .leyenda-item {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: 0.5rem;
-  font-size: 0.8125rem;
+  gap: 0.45rem;
+  min-width: 0;
+  font-size: 0.79rem;
   color: var(--color-text-muted);
+  line-height: 1.28;
+  white-space: normal;
 }
 .leyenda-item i {
   width: 14px;
   height: 14px;
   border-radius: 50%;
   display: inline-block;
+  flex-shrink: 0;
 }
 
 @media (max-width: 900px) {
@@ -134,7 +150,17 @@ onUnmounted(() => {
   }
   .mapa-box {
     padding: 0.35rem;
+    max-height: 360px;
+  }
+  .leyenda-items {
+    grid-template-columns: 1fr 1fr;
     max-height: none;
+  }
+}
+
+@media (max-width: 620px) {
+  .leyenda-items {
+    grid-template-columns: 1fr;
   }
 }
 </style>

@@ -1,5 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import { getToken } from '../api/auth'
+import { getToken, getUsuario } from '../api/auth'
 
 const routes = [
   {
@@ -45,10 +45,10 @@ const routes = [
     meta: { title: 'Iniciar sesión' },
   },
   {
-    path: '/registro',
-    name: 'Registro',
+    path: '/usuarios',
+    name: 'Usuarios',
     component: () => import('../views/RegistroView.vue'),
-    meta: { title: 'Registrarse' },
+    meta: { title: 'Usuarios', requiresAuth: true, requiresAdmin: true },
   },
 ]
 
@@ -59,16 +59,25 @@ const router = createRouter({
 
 router.beforeEach((to, _from, next) => {
   document.title = to.meta.title
-    ? `${to.meta.title} - Protección Civil Carabobo`
-    : 'Protección Civil Carabobo'
+    ? `${to.meta.title} - IASIEDAGREC`
+    : 'IASIEDAGREC'
 
   const token = getToken()
+  const usuario = getUsuario()
   if (to.meta.requiresAuth && !token) {
     next('/login')
     return
   }
-  if ((to.path === '/login' || to.path === '/registro') && token) {
+  if (to.meta.requiresAdmin && (!usuario || usuario.rol !== 'admin')) {
     next('/')
+    return
+  }
+  if (token && usuario?.rol === 'admin' && to.path !== '/usuarios' && to.path !== '/login') {
+    next('/usuarios')
+    return
+  }
+  if (to.path === '/login' && token) {
+    next(usuario?.rol === 'admin' ? '/usuarios' : '/')
     return
   }
   next()

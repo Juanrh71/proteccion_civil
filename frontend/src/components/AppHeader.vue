@@ -3,22 +3,26 @@
     <div class="header-inner">
       <router-link to="/" class="logo">
         <img src="/imagenes/logo.png" alt="Protección Civil y Administración de Desastres" class="logo-img" width="52" height="52" />
-        <span class="logo-text">Protección Civil Carabobo</span>
+        <span class="logo-text">IASIEDAGREC</span>
       </router-link>
       <nav class="nav">
         <template v-if="estaAutenticado">
-          <router-link to="/" class="nav-link">Inicio</router-link>
-          <router-link to="/mapa" class="nav-link">Mapa en vivo</router-link>
-          <router-link to="/registrar" class="nav-link">Registrar</router-link>
-          <router-link to="/incidentes" class="nav-link">Incidentes</router-link>
-          <router-link to="/dashboard" class="nav-link">Dashboard</router-link>
-          <router-link to="/reportes" class="nav-link">Reportes</router-link>
+          <template v-if="esAdmin">
+            <router-link to="/usuarios" class="nav-link">Usuarios</router-link>
+          </template>
+          <template v-else>
+            <router-link to="/" class="nav-link">Inicio</router-link>
+            <router-link to="/mapa" class="nav-link">Mapa en vivo</router-link>
+            <router-link to="/registrar" class="nav-link">Registrar</router-link>
+            <router-link to="/incidentes" class="nav-link">Incidentes</router-link>
+            <router-link to="/dashboard" class="nav-link">Dashboard</router-link>
+            <router-link to="/reportes" class="nav-link">Reportes</router-link>
+          </template>
           <span class="nav-user">{{ nombreUsuario }}</span>
           <button type="button" class="btn-logout" @click="cerrarSesion">Cerrar sesión</button>
         </template>
         <template v-else>
           <router-link to="/login" class="nav-link">Iniciar sesión</router-link>
-          <router-link to="/registro" class="nav-link">Registrarse</router-link>
         </template>
       </nav>
     </div>
@@ -32,6 +36,7 @@ import { useAuth } from '../composables/useAuth'
 
 const router = useRouter()
 const { usuario, estaAutenticado, logout } = useAuth()
+const esAdmin = computed(() => usuario.value?.rol === 'admin')
 
 const nombreUsuario = computed(() => {
   const u = usuario.value

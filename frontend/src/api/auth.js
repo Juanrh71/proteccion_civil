@@ -7,6 +7,18 @@ const api = axios.create({
   headers: { 'Content-Type': 'application/json' },
 })
 
+api.interceptors.request.use(
+  (config) => {
+    const token = getToken()
+    if (token) {
+      config.headers = config.headers || {}
+      config.headers.Authorization = `Bearer ${token}`
+    }
+    return config
+  },
+  (err) => Promise.reject(err)
+)
+
 const TOKEN_KEY = 'auth_token'
 const USER_KEY = 'auth_usuario'
 
@@ -35,6 +47,16 @@ export function clearAuth() {
 
 export async function registro(datos) {
   const { data } = await api.post('/api/auth/registro', datos)
+  return data
+}
+
+export async function listarUsuarios(estatus = 'activo') {
+  const { data } = await api.get('/api/auth/usuarios', { params: { estatus } })
+  return data
+}
+
+export async function cambiarEstatusUsuario(id, estatus) {
+  const { data } = await api.patch(`/api/auth/usuarios/${id}/estatus`, { estatus })
   return data
 }
 

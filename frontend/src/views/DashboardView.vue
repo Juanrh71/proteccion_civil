@@ -68,10 +68,10 @@
         </div>
       </div>
       <div class="dash-card chart-panel">
-        <h2 class="chart-title">Por tipo de incidente</h2>
+        <h2 class="chart-title">Por tipo de incidente (últimas 24 horas)</h2>
         <div class="chart-box">
           <Doughnut v-if="tieneTortaTipo" :data="tipoPieData" :options="tipoPieOptions" />
-          <p v-else class="chart-empty">Sin datos para gráfico.</p>
+          <p v-else class="chart-empty">Sin datos en las últimas 24 horas.</p>
         </div>
       </div>
     </section>
@@ -98,17 +98,17 @@
         <MapaCarabobo :incidentes="incidentesFiltradosMapa" mostrar-buscador />
       </div>
       <div class="leyenda-mapa">
-        <span class="leyenda-item"><i style="background:#dc2626"></i> Médico</span>
-        <span class="leyenda-item"><i style="background:#ea580c"></i> Vial</span>
-        <span class="leyenda-item"><i style="background:#b91c1c"></i> Incendio</span>
-        <span class="leyenda-item"><i style="background:#64748b"></i> Otro</span>
+        <span v-for="cat in categoriasLeyendaMapa" :key="cat.id" class="leyenda-item">
+          <i :style="{ background: cat.color }"></i>
+          {{ cat.nombre }}
+        </span>
       </div>
     </section>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -131,8 +131,12 @@ import {
   RANGO_ANO_FIN,
   añoSugeridoParaIncidentes,
   MUNICIPIOS_CARABOBO,
-  TIPOS_INCIDENTE,
 } from '../config/incidentes'
+import {
+  LEYENDA_GRUPOS_EXCEL,
+  grupoExcelDeIncidente,
+  colorGrupoExcel,
+} from '../utils/clasificacionExcelIncidentes.js'
 
 ChartJS.register(
   CategoryScale,
@@ -167,42 +171,7 @@ const COLOR_FILL = 'rgba(128, 0, 0, 0.2)'
 const COLOR_LINE = '#800000'
 const COLOR_BAR_MAIN = 'rgba(0, 51, 204, 0.85)'
 
-const colorPorCategoria = {
-  medico: '#dc2626',
-  vial: '#ea580c',
-  incendio: '#b91c1c',
-  riesgo_quimico: '#7c3aed',
-  rescate: '#0284c7',
-  socio_natural: '#0d9488',
-  prevencion: '#059669',
-  educacion: '#ca8a04',
-  administrativo: '#6b7280',
-  otro: '#64748b',
-}
-
-const etiquetaCategoria = {
-  medico: 'Médico / Salud',
-  vial: 'Vial',
-  incendio: 'Incendio',
-  riesgo_quimico: 'Riesgo químico / GLP',
-  rescate: 'Rescate',
-  socio_natural: 'Socio-natural',
-  prevencion: 'Prevención',
-  educacion: 'Educación',
-  administrativo: 'Administrativo',
-  otro: 'Otro',
-}
-
-const categoriasOpciones = (function () {
-  const set = new Set()
-  for (const t of TIPOS_INCIDENTE) {
-    if (t.categoria) set.add(t.categoria)
-  }
-  return [...set].map((id) => ({
-    id,
-    nombre: etiquetaCategoria[id] || id,
-  }))
-})()
+const categoriasOpciones = LEYENDA_GRUPOS_EXCEL.map((c) => ({ id: c.id, nombre: c.nombre }))
 
 const incidentes = ref([])
 const vistaPeriodo = ref('mes')
@@ -215,6 +184,9 @@ const filtroCatDash = ref('')
 const filtroDia = ref(new Date().getDate())
 const filtroMes = ref(new Date().getMonth() + 1)
 const filtroAno = ref(añoSugeridoParaIncidentes())
+const ahoraMs = ref(Date.now())
+let reloj24h = null
+let pollingIncidentes = null
 
 const anos = computed(() => {
   const list = []
@@ -309,7 +281,7 @@ const incidentesFiltradosCapa = computed(() => {
     list = list.filter((inc) => inc.municipio === filtroMuniDash.value)
   }
   if (filtroCatDash.value) {
-    list = list.filter((inc) => (inc.categoria || 'otro') === filtroCatDash.value)
+    list = list.filter((inc) => grupoExcelDeIncidente(inc) === filtroCatDash.value)
   }
   return list
 })
@@ -325,6 +297,17 @@ const incidentesEnPeriodo = computed(() => {
     return list.filter((inc) => incEnDia(inc, y, m, periodoDia.value))
   }
   return list.filter((inc) => incEnAno(inc, periodoAnio.value))
+})
+
+const incidentesUltimas24h = computed(() => {
+  const ahora = ahoraMs.value
+  const desde = ahora - 24 * 60 * 60 * 1000
+  return incidentesFiltradosCapa.value.filter((inc) => {
+    const d = parseFechaInc(inc)
+    if (!d) return false
+    const t = d.getTime()
+    return t >= desde && t <= ahora
+  })
 })
 
 const lineChartData = computed(() => {
@@ -498,12 +481,11 @@ const muniBarData = computed(() => {
 })
 
 const tipoPieData = computed(() => {
-  const top = contarPorClave(incidentesEnPeriodo.value, (inc) => inc.tipo_nombre || inc.tipo || 'Otro').slice(0, 12)
+  const top = contarPorClave(incidentesUltimas24h.value, (inc) => inc.tipo_nombre || inc.tipo || 'Otro').slice(0, 12)
   const colores = []
   for (const [label] of top) {
-    const incMatch = incidentesEnPeriodo.value.find((inc) => (inc.tipo_nombre || inc.tipo || 'Otro') === label)
-    const categoria = incMatch?.categoria || 'otro'
-    colores.push(colorPorCategoria[categoria] || '#64748b')
+    const incMatch = incidentesUltimas24h.value.find((inc) => (inc.tipo_nombre || inc.tipo || 'Otro') === label)
+    colores.push(colorGrupoExcel(incMatch))
   }
   return {
     labels: top.map((e) => (e[0].length > 38 ? e[0].slice(0, 36) + '…' : e[0])),
@@ -557,8 +539,28 @@ const incidentesFiltradosMapa = computed(() => {
   })
 })
 
+const categoriasLeyendaMapa = computed(() => LEYENDA_GRUPOS_EXCEL)
+
 onMounted(async () => {
   incidentes.value = await obtenerIncidentes()
+  reloj24h = setInterval(() => {
+    ahoraMs.value = Date.now()
+  }, 60000)
+  pollingIncidentes = setInterval(async () => {
+    incidentes.value = await obtenerIncidentes()
+    ahoraMs.value = Date.now()
+  }, 60000)
+})
+
+onUnmounted(() => {
+  if (reloj24h != null) {
+    clearInterval(reloj24h)
+    reloj24h = null
+  }
+  if (pollingIncidentes != null) {
+    clearInterval(pollingIncidentes)
+    pollingIncidentes = null
+  }
 })
 </script>
 
@@ -710,18 +712,24 @@ onMounted(async () => {
 }
 
 .leyenda-mapa {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem 1rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.35rem 0.9rem;
   margin-top: 0.75rem;
-  font-size: 0.8125rem;
+  font-size: 0.79rem;
   color: var(--color-text-muted);
+  max-height: 170px;
+  overflow-y: auto;
+  padding-right: 0.2rem;
 }
 
 .leyenda-mapa .leyenda-item {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: 0.35rem;
+  gap: 0.4rem;
+  min-width: 0;
+  line-height: 1.25;
+  white-space: normal;
 }
 
 .leyenda-mapa .leyenda-item i {
@@ -729,5 +737,19 @@ onMounted(async () => {
   height: 12px;
   border-radius: 50%;
   display: inline-block;
+  flex-shrink: 0;
+}
+
+@media (max-width: 760px) {
+  .leyenda-mapa {
+    grid-template-columns: 1fr 1fr;
+    max-height: none;
+  }
+}
+
+@media (max-width: 560px) {
+  .leyenda-mapa {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

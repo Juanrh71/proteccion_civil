@@ -34,7 +34,7 @@
         </div>
         <p v-if="mensajeGlobal" class="msg error">{{ mensajeGlobal }}</p>
         <p class="auth-link">
-          ¿No tiene cuenta? <router-link to="/registro">Registrarse</router-link>
+          Si no tiene cuenta, contacte al administrador.
         </p>
       </form>
     </div>

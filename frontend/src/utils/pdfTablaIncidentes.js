@@ -9,8 +9,7 @@ const COLUMNAS_TABLA = [
   'Parroquia',
   'Calle / Avenida',
   'Estado',
-  'Descripción',
-  'Ubicación',
+  'Resultado',
 ]
 
 export function textoParaPdf(value) {

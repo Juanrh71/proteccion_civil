@@ -18,6 +18,14 @@ export function useAuth() {
     return authApi.registro(datos)
   }
 
+  function listarUsuarios(estatus) {
+    return authApi.listarUsuarios(estatus)
+  }
+
+  function cambiarEstatusUsuario(id, estatus) {
+    return authApi.cambiarEstatusUsuario(id, estatus)
+  }
+
   function logout() {
     authApi.logout()
     token.value = null
@@ -35,6 +43,8 @@ export function useAuth() {
     estaAutenticado,
     login,
     registro,
+    listarUsuarios,
+    cambiarEstatusUsuario,
     logout,
     initFromStorage,
     getToken: authApi.getToken,

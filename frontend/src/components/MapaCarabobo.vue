@@ -28,6 +28,7 @@ import { ref, onMounted, onUnmounted, watch } from 'vue'
 import L from 'leaflet'
 import { MAPA_CENTRO_CARABOBO, MAPA_ZOOM_DEFAULT } from '../config/incidentes'
 import { buscarLugarPhoton } from '../utils/geocodingPhoton.js'
+import { colorGrupoExcel } from '../utils/clasificacionExcelIncidentes.js'
 
 const props = defineProps({
   incidentes: {
@@ -69,24 +70,8 @@ let map = null
 let layerGroup = null
 let capaMarcadorBusqueda = null
 
-function getIconColor(categoria) {
-  if (categoria === 'medico') return '#dc2626'
-  if (categoria === 'vial') return '#ea580c'
-  if (categoria === 'incendio') return '#b91c1c'
-  if (categoria === 'riesgo_quimico') return '#7c3aed'
-  if (categoria === 'rescate') return '#0284c7'
-  if (categoria === 'socio_natural') return '#0d9488'
-  if (categoria === 'prevencion') return '#059669'
-  if (categoria === 'educacion') return '#ca8a04'
-  if (categoria === 'administrativo') return '#6b7280'
-  if (categoria === 'otro') return '#64748b'
-  return '#64748b'
-}
-
 function crearIcono(incidente) {
-  let cat = 'otro'
-  if (incidente.categoria) cat = incidente.categoria
-  const color = getIconColor(cat)
+  const color = colorGrupoExcel(incidente)
   const html =
     '<span style="background:' +
     color +

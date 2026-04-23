@@ -8,9 +8,33 @@ const JWT_SECRET = process.env.JWT_SECRET || 'clave_secreta_cambiar_en_produccio
 const SALT_ROUNDS = 10
 const MIN_PASSWORD_LENGTH = 6
 const cedulaRegex = /^[VJE]\d{6,9}$/
-const telefonoRegex = /^04\d{8}$/
+// Móvil Venezuela: 04 + operadora (2) + 7 = 11 dígitos (ej. 04124413318)
+const telefonoRegex = /^04\d{9}$/
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+function authTokenDesdeHeader(req) {
+  const auth = req.headers.authorization || ''
+  if (!auth.startsWith('Bearer ')) return null
+  return auth.slice(7)
+}
+
+async function requireAdmin(req, res, next) {
+  try {
+    const token = authTokenDesdeHeader(req)
+    if (!token) return res.status(401).json({ error: 'No autorizado.' })
+    const payload = jwt.verify(token, JWT_SECRET)
+    const [rows] = await pool.query('SELECT id, rol, estatus FROM usuarios WHERE id = ?', [payload.id])
+    if (!rows.length) return res.status(401).json({ error: 'No autorizado.' })
+    const u = rows[0]
+    if (u.estatus !== 'activo') return res.status(403).json({ error: 'Usuario inactivo.' })
+    if (u.rol !== 'admin') return res.status(403).json({ error: 'Acceso solo para administrador.' })
+    req.authUser = { id: u.id, rol: u.rol }
+    next()
+  } catch {
+    return res.status(401).json({ error: 'Token inválido o expirado.' })
+  }
+}
 
 function validarRegistro(body) {
   const errores = []
@@ -28,7 +52,9 @@ function validarRegistro(body) {
   if (!telefono || !telefono.toString().trim()) errores.push('El teléfono es requerido.')
   else {
     const t = telefono.toString().replace(/\s/g, '')
-    if (!telefonoRegex.test(t)) errores.push('El teléfono debe ser un código 04xx más 6 dígitos (10 en total).')
+    if (!telefonoRegex.test(t)) {
+      errores.push('El teléfono debe ser móvil Venezuela: 04xx más 7 dígitos (11 en total, ej. 04124413318).')
+    }
   }
   if (!password || !password.toString()) errores.push('La contraseña es requerida.')
   else if (password.length < MIN_PASSWORD_LENGTH) errores.push(`La contraseña debe tener al menos ${MIN_PASSWORD_LENGTH} caracteres.`)
@@ -37,7 +63,7 @@ function validarRegistro(body) {
   return errores
 }
 
-router.post('/registro', async (req, res) => {
+router.post('/registro', requireAdmin, async (req, res) => {
   try {
     const errores = validarRegistro(req.body)
     if (errores.length > 0) {
@@ -50,6 +76,8 @@ router.post('/registro', async (req, res) => {
     const cedula = req.body.cedula.toString().replace(/\s/g, '').toUpperCase()
     const telefono = req.body.telefono.toString().replace(/\s/g, '')
     const password = req.body.password
+    // Registro web (solo admin): siempre oficial. Civil/oficial vía app móvil, más adelante.
+    const rol = 'oficial'
 
     const [existingEmail] = await pool.query('SELECT id FROM usuarios WHERE correo = ?', [correo])
     if (existingEmail.length > 0) {
@@ -62,13 +90,56 @@ router.post('/registro', async (req, res) => {
 
     const password_hash = await bcrypt.hash(password, SALT_ROUNDS)
     await pool.query(
-      'INSERT INTO usuarios (nombre, apellido, correo, cedula, telefono, password_hash) VALUES (?, ?, ?, ?, ?, ?)',
-      [nombre, apellido, correo, cedula, telefono, password_hash]
+      `INSERT INTO usuarios
+       (nombre, apellido, correo, cedula, telefono, rol, estatus, password_hash)
+       VALUES (?, ?, ?, ?, ?, ?, 'activo', ?)`,
+      [nombre, apellido, correo, cedula, telefono, rol, password_hash]
     )
     res.status(201).json({ message: 'Usuario registrado correctamente.' })
   } catch (err) {
     console.error(err)
     res.status(500).json({ error: 'Error al registrar el usuario.' })
+  }
+})
+
+router.get('/usuarios', requireAdmin, async (req, res) => {
+  try {
+    const estatus = String(req.query.estatus || 'activo').toLowerCase()
+    let sql =
+      'SELECT id, nombre, apellido, correo, cedula, telefono, rol, estatus, created_at FROM usuarios'
+    const params = []
+    if (estatus === 'activo' || estatus === 'inactivo') {
+      sql += ' WHERE estatus = ?'
+      params.push(estatus)
+    }
+    sql += ' ORDER BY created_at DESC'
+    const [rows] = await pool.query(sql, params)
+    res.json(rows)
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Error al consultar usuarios.' })
+  }
+})
+
+router.patch('/usuarios/:id/estatus', requireAdmin, async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10)
+    if (isNaN(id)) return res.status(400).json({ error: 'Id inválido.' })
+    const estatus = String(req.body.estatus || '').toLowerCase()
+    if (estatus !== 'activo' && estatus !== 'inactivo') {
+      return res.status(400).json({ error: 'Estatus inválido. Debe ser activo o inactivo.' })
+    }
+    if (id === req.authUser.id) {
+      return res.status(400).json({ error: 'No puede cambiar su propio estatus.' })
+    }
+    const [result] = await pool.query('UPDATE usuarios SET estatus = ? WHERE id = ?', [estatus, id])
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Usuario no encontrado.' })
+    }
+    res.json({ ok: true })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Error al actualizar estatus del usuario.' })
   }
 })
 
@@ -84,13 +155,17 @@ router.post('/login', async (req, res) => {
     }
 
     const [rows] = await pool.query(
-      'SELECT id, nombre, apellido, correo, cedula, telefono, password_hash FROM usuarios WHERE correo = ?',
+      `SELECT id, nombre, apellido, correo, cedula, telefono, rol, estatus, password_hash
+       FROM usuarios WHERE correo = ?`,
       [correoNorm]
     )
     if (rows.length === 0) {
       return res.status(401).json({ error: 'Credenciales incorrectas.' })
     }
     const user = rows[0]
+    if (user.estatus === 'inactivo') {
+      return res.status(403).json({ error: 'Usuario inactivo. Contacte al administrador.' })
+    }
     const match = await bcrypt.compare(password, user.password_hash)
     if (!match) {
       return res.status(401).json({ error: 'Credenciales incorrectas.' })
@@ -110,6 +185,8 @@ router.post('/login', async (req, res) => {
         correo: user.correo,
         cedula: user.cedula,
         telefono: user.telefono,
+        rol: user.rol,
+        estatus: user.estatus,
       },
     })
   } catch (err) {

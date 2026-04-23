@@ -1,7 +1,7 @@
 <template>
   <div class="app">
     <AppHeader />
-    <main :class="['main', { 'main-reportes-scroll': esVistaReportes }]">
+    <main :class="['main', { 'main-reportes-scroll': scrollPrincipal }]">
       <router-view />
     </main>
     <AppFooter />
@@ -15,7 +15,9 @@ import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 
 const route = useRoute()
-const esVistaReportes = computed(() => route.name === 'Dashboard' || route.name === 'Reportes')
+const scrollPrincipal = computed(
+  () => route.name === 'Dashboard' || route.name === 'Reportes' || route.name === 'Usuarios'
+)
 </script>
 
 <style scoped>
@@ -35,7 +37,9 @@ const esVistaReportes = computed(() => route.name === 'Dashboard' || route.name 
 }
 
 .main.main-reportes-scroll {
+  min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
 }
 </style>

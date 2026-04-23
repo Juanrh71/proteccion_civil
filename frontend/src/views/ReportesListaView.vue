@@ -4,68 +4,159 @@
       <h1 class="page-title">Reportes</h1>
     </div>
 
-    <section class="filtros-fecha card">
-      <div class="filtros-row">
-        <div class="form-group">
-          <label>Día</label>
-          <select v-model.number="filtroDia" class="input">
-            <option v-for="n in diasDelMes" :key="n" :value="n">{{ n }}</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>Mes</label>
-          <select v-model.number="filtroMes" class="input">
-            <option v-for="(nombre, idx) in MESES" :key="idx" :value="idx + 1">{{ nombre }}</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>Año</label>
-          <select v-model.number="filtroAno" class="input">
-            <option v-for="y in anos" :key="y" :value="y">{{ y }}</option>
-          </select>
-        </div>
-      </div>
-      <p class="filtro-resumen">{{ etiquetaFechaSeleccionada }} · {{ lista.length }} incidente(s)</p>
+    <section class="menu-reportes card">
+      <button
+        type="button"
+        class="menu-btn"
+        :class="{ activo: vistaReportes === 'diarios' }"
+        @click="vistaReportes = 'diarios'"
+      >
+        Reportes diarios
+      </button>
+      <button
+        type="button"
+        class="menu-btn"
+        :class="{ activo: vistaReportes === 'historico' }"
+        @click="vistaReportes = 'historico'"
+      >
+        Comparativa histórica
+      </button>
     </section>
 
-    <div class="card tabla-card">
-      <div v-if="lista.length === 0" class="lista-vacio">No hay incidentes registrados para esta fecha.</div>
-      <div v-else class="tabla-wrap">
-        <table class="tabla">
-          <thead>
-            <tr>
-              <th>N°</th>
-              <th>Fecha</th>
-              <th>Tipo</th>
-              <th>Municipio</th>
-              <th>Parroquia</th>
-              <th>Calle / Avenida</th>
-              <th>Estado</th>
-              <th>Descripción</th>
-              <th>Ubicación</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="(inc, idx) in lista" :key="inc.id">
-              <td>{{ idx + 1 }}</td>
-              <td>{{ formatearFecha(inc.fecha) }}</td>
-              <td>{{ inc.tipo_nombre || inc.tipo }}</td>
-              <td>{{ inc.municipio || '—' }}</td>
-              <td>{{ inc.parroquia || '—' }}</td>
-              <td>{{ inc.via || '—' }}</td>
-              <td>
-                <span v-if="textoEstadoListado(inc) === 'Cerrado'" class="badge-estado badge-cerrado">Cerrado</span>
-                <span v-else-if="textoEstadoListado(inc) === 'En proceso'" class="badge-estado badge-proceso">En proceso</span>
-                <span v-else class="badge-estado badge-abierto">Abierto</span>
-              </td>
-              <td>{{ inc.descripcion || '—' }}</td>
-              <td>
-                <span v-if="inc.lat != null && inc.lng != null">{{ Number(inc.lat).toFixed(4) }}, {{ Number(inc.lng).toFixed(4) }}</span>
-                <span v-else>—</span>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+    <template v-if="vistaReportes === 'diarios'">
+      <div class="titulo-acciones secundarios">
+        <button type="button" class="btn btn-secondary" :disabled="descargandoPdf || lista.length === 0" @click="descargarPdf">
+          {{ descargandoPdf ? 'Generando PDF…' : 'Descargar PDF' }}
+        </button>
+      </div>
+
+      <section class="filtros-fecha card">
+        <div class="filtros-row">
+          <div class="form-group">
+            <label>Día</label>
+            <select v-model.number="filtroDia" class="input">
+              <option v-for="n in diasDelMes" :key="n" :value="n">{{ n }}</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Mes</label>
+            <select v-model.number="filtroMes" class="input">
+              <option v-for="(nombre, idx) in MESES" :key="idx" :value="idx + 1">{{ nombre }}</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Año</label>
+            <select v-model.number="filtroAno" class="input">
+              <option v-for="y in anos" :key="y" :value="y">{{ y }}</option>
+            </select>
+          </div>
+        </div>
+        <p class="filtro-resumen">{{ etiquetaFechaSeleccionada }} · {{ lista.length }} incidente(s)</p>
+      </section>
+
+      <div class="card tabla-card">
+        <div v-if="lista.length === 0" class="lista-vacio">No hay incidentes registrados para esta fecha.</div>
+        <div v-else class="tabla-wrap">
+          <table class="tabla">
+            <thead>
+              <tr>
+                <th>N°</th>
+                <th>Fecha</th>
+                <th>Tipo</th>
+                <th>Municipio</th>
+                <th>Parroquia</th>
+                <th>Calle / Avenida</th>
+                <th>Estado</th>
+                <th>Resultado</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(inc, idx) in lista" :key="inc.id">
+                <td>{{ idx + 1 }}</td>
+                <td>{{ formatearFecha(inc.fecha) }}</td>
+                <td>{{ inc.tipo_nombre || inc.tipo }}</td>
+                <td>{{ inc.municipio || '—' }}</td>
+                <td>{{ inc.parroquia || '—' }}</td>
+                <td>{{ inc.via || '—' }}</td>
+                <td>
+                  <span v-if="textoEstadoListado(inc) === 'Cerrado'" class="badge-estado badge-cerrado">Cerrado</span>
+                  <span v-else-if="textoEstadoListado(inc) === 'En proceso'" class="badge-estado badge-proceso">En proceso</span>
+                  <span v-else class="badge-estado badge-abierto">Abierto</span>
+                </td>
+                <td>
+                  <button
+                    v-if="textoEstadoListado(inc) === 'Cerrado'"
+                    type="button"
+                    class="btn-resultado-tabla"
+                    @click="abrirModalVerResultado(inc)"
+                  >
+                    Resultado
+                  </button>
+                  <span v-else class="celda-sin-resultado">—</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </template>
+
+    <template v-else>
+      <section class="filtros-fecha card">
+        <div class="filtros-row">
+          <div class="form-group">
+            <label>Modo de comparación</label>
+            <select v-model="modoComparativa" class="input">
+              <option value="meses">Comparar meses</option>
+              <option value="anios">Comparar años</option>
+            </select>
+          </div>
+
+          <div v-if="modoComparativa === 'meses'" class="form-group">
+            <label>Año base</label>
+            <select v-model.number="anioComparativa" class="input">
+              <option v-for="y in aniosDisponiblesComparativa" :key="`m-${y}`" :value="y">{{ y }}</option>
+            </select>
+          </div>
+        </div>
+        <div v-if="modoComparativa === 'meses'" class="selector-grid">
+          <label v-for="(mes, idx) in MESES" :key="mes" class="selector-item">
+            <input type="checkbox" :checked="mesesSeleccionados.includes(idx + 1)" @change="toggleMesComparativa(idx + 1)" />
+            <span>{{ mes }}</span>
+          </label>
+        </div>
+        <div v-else class="selector-grid">
+          <label v-for="y in aniosDisponiblesComparativa" :key="`a-${y}`" class="selector-item">
+            <input type="checkbox" :checked="aniosSeleccionados.includes(y)" @change="toggleAnioComparativa(y)" />
+            <span>{{ y }}</span>
+          </label>
+        </div>
+
+        <div class="acciones-historico">
+          <button type="button" class="btn btn-secondary" :disabled="descargandoPdfHistorico" @click="descargarPdfHistorico">
+            {{ descargandoPdfHistorico ? 'Generando PDF…' : 'Descargar PDF comparativa' }}
+          </button>
+        </div>
+      </section>
+    </template>
+
+    <div
+      v-if="mostrarModalVerResultado"
+      class="modal-overlay"
+      @click.self="cerrarModalVerResultado"
+    >
+      <div class="modal-ver-resultado card" role="dialog" aria-labelledby="titulo-ver-resultado-reportes">
+        <h3 id="titulo-ver-resultado-reportes" class="modal-title-reportes">Resultado del incidente</h3>
+        <template v-if="incidenteVerResultado">
+          <div v-if="textoResultadoModalLeer(incidenteVerResultado)" class="bloque-resultado">
+            <p class="bloque-resultado-label">Resultado</p>
+            <p class="bloque-resultado-texto">{{ textoResultadoModalLeer(incidenteVerResultado) }}</p>
+          </div>
+          <p v-else class="sin-resultado-msg">No hay resultado registrado para este incidente.</p>
+        </template>
+        <div class="modal-acciones-reportes">
+          <button type="button" class="btn btn-secondary" @click="cerrarModalVerResultado">Cerrar</button>
+        </div>
       </div>
     </div>
   </div>
@@ -75,6 +166,8 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import { obtenerIncidentes } from '../api/incidentes'
 import { descargarPdfTablaIncidentes } from '../utils/pdfTablaIncidentes.js'
+import { etiquetaResultadoPdf, textoResultadoModalLeer } from '../utils/resultadoIncidente.js'
+import { descargarPdfComparativaHistorica } from '../utils/pdfComparativaHistorica.js'
 import {
   RANGO_ANO_INICIO,
   RANGO_ANO_FIN,
@@ -97,16 +190,34 @@ const MESES = [
 ]
 
 const incidentes = ref([])
+const vistaReportes = ref('diarios')
 const filtroDia = ref(new Date().getDate())
 const filtroMes = ref(new Date().getMonth() + 1)
 const filtroAno = ref(añoSugeridoParaIncidentes())
 const descargandoPdf = ref(false)
 const logoPdfDataUrl = ref(null)
+const mostrarModalVerResultado = ref(false)
+const incidenteVerResultado = ref(null)
+const modoComparativa = ref('meses')
+const anioComparativa = ref(añoSugeridoParaIncidentes())
+const mesesSeleccionados = ref([new Date().getMonth() + 1])
+const aniosSeleccionados = ref([añoSugeridoParaIncidentes()])
+const descargandoPdfHistorico = ref(false)
 
 const anos = computed(() => {
   const list = []
   for (let y = RANGO_ANO_INICIO; y <= RANGO_ANO_FIN; y++) list.push(y)
   return list
+})
+
+const aniosDisponiblesComparativa = computed(() => {
+  const base = new Set(anos.value)
+  for (const inc of incidentes.value) {
+    const d = parseFechaInc(inc)
+    if (!d) continue
+    base.add(d.getFullYear())
+  }
+  return Array.from(base).sort((a, b) => a - b)
 })
 
 const diasDelMes = computed(() => {
@@ -167,6 +278,16 @@ function textoEstadoListado(inc) {
   return 'Abierto'
 }
 
+function abrirModalVerResultado(inc) {
+  incidenteVerResultado.value = inc
+  mostrarModalVerResultado.value = true
+}
+
+function cerrarModalVerResultado() {
+  mostrarModalVerResultado.value = false
+  incidenteVerResultado.value = null
+}
+
 function cargarLogoBase64() {
   return new Promise((resolve) => {
     const img = new Image()
@@ -204,13 +325,10 @@ function descargarPdf() {
       inc.parroquia || '—',
       inc.via || '—',
       textoEstadoListado(inc),
-      inc.descripcion || '—',
-      inc.lat != null && inc.lng != null
-        ? `${Number(inc.lat).toFixed(4)}, ${Number(inc.lng).toFixed(4)}`
-        : '—',
+      etiquetaResultadoPdf(inc),
     ])
     const stamp = new Date().toISOString().slice(0, 19).replace(/[-:T]/g, '')
-    const fechaSlug = `${filtroAnio.value}-${String(filtroMes.value).padStart(2, '0')}-${String(filtroDia.value).padStart(2, '0')}`
+    const fechaSlug = `${filtroAno.value}-${String(filtroMes.value).padStart(2, '0')}-${String(filtroDia.value).padStart(2, '0')}`
     descargarPdfTablaIncidentes({
       logoDataUrl: logoPdfDataUrl.value,
       tituloPrincipal: 'Incidentes por fecha',
@@ -230,8 +348,96 @@ function descargarPdf() {
   }
 }
 
+function toggleMesComparativa(m) {
+  if (mesesSeleccionados.value.includes(m)) {
+    mesesSeleccionados.value = mesesSeleccionados.value.filter((x) => x !== m)
+  } else {
+    mesesSeleccionados.value = [...mesesSeleccionados.value, m].sort((a, b) => a - b)
+  }
+}
+
+function toggleAnioComparativa(y) {
+  if (aniosSeleccionados.value.includes(y)) {
+    aniosSeleccionados.value = aniosSeleccionados.value.filter((x) => x !== y)
+  } else {
+    aniosSeleccionados.value = [...aniosSeleccionados.value, y].sort((a, b) => a - b)
+  }
+}
+
+function contarPorMes(anio, mes) {
+  let total = 0
+  for (const inc of incidentes.value) {
+    const d = parseFechaInc(inc)
+    if (!d) continue
+    if (d.getFullYear() === anio && d.getMonth() + 1 === mes) total += 1
+  }
+  return total
+}
+
+function contarPorAnio(anio) {
+  let total = 0
+  for (const inc of incidentes.value) {
+    const d = parseFechaInc(inc)
+    if (!d) continue
+    if (d.getFullYear() === anio) total += 1
+  }
+  return total
+}
+
+function descargarPdfHistorico() {
+  try {
+    descargandoPdfHistorico.value = true
+    if (modoComparativa.value === 'meses') {
+      const meses = [...mesesSeleccionados.value].sort((a, b) => a - b)
+      if (meses.length < 2) {
+        alert('Seleccione al menos 2 meses para comparar.')
+        return
+      }
+      const etiquetas = meses.map((m) => MESES[m - 1])
+      const valores = meses.map((m) => contarPorMes(anioComparativa.value, m))
+      const stamp = new Date().toISOString().slice(0, 19).replace(/[-:T]/g, '')
+      descargarPdfComparativaHistorica({
+        titulo: 'Comparativa histórica por meses',
+        subtitulo: `Año ${anioComparativa.value}`,
+        etiquetas,
+        valores,
+        nombreArchivo: `comparativa_meses_${anioComparativa.value}_${stamp}.pdf`,
+      })
+      return
+    }
+
+    const anios = [...aniosSeleccionados.value].sort((a, b) => a - b)
+    if (anios.length < 2) {
+      alert('Seleccione al menos 2 años para comparar (por ejemplo 2026 y 2027).')
+      return
+    }
+    const etiquetas = anios.map((y) => String(y))
+    const valores = anios.map((y) => contarPorAnio(y))
+    const stamp = new Date().toISOString().slice(0, 19).replace(/[-:T]/g, '')
+    descargarPdfComparativaHistorica({
+      titulo: 'Comparativa histórica por años',
+      subtitulo: 'Incidentes registrados',
+      etiquetas,
+      valores,
+      nombreArchivo: `comparativa_anios_${stamp}.pdf`,
+    })
+  } catch (err) {
+    console.error(err)
+    alert('No se pudo generar el PDF histórico. Intente de nuevo.')
+  } finally {
+    descargandoPdfHistorico.value = false
+  }
+}
+
 onMounted(async () => {
   incidentes.value = await obtenerIncidentes()
+  if (!aniosDisponiblesComparativa.value.includes(anioComparativa.value)) {
+    anioComparativa.value = aniosDisponiblesComparativa.value[0] || añoSugeridoParaIncidentes()
+  }
+  if (aniosSeleccionados.value.length === 0) {
+    const ultimos = aniosDisponiblesComparativa.value.slice(-2)
+    aniosSeleccionados.value = ultimos.length > 0 ? ultimos : [añoSugeridoParaIncidentes()]
+  }
   logoPdfDataUrl.value = await cargarLogoBase64()
 })
 </script>
@@ -248,6 +454,34 @@ onMounted(async () => {
   justify-content: space-between;
   gap: 1rem;
   margin-bottom: 1.25rem;
+}
+
+.titulo-acciones.secundarios {
+  justify-content: flex-end;
+  margin-bottom: 0.6rem;
+}
+
+.menu-reportes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  align-items: center;
+}
+
+.menu-btn {
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  color: var(--color-secondary);
+  border-radius: 10px;
+  padding: 0.5rem 0.8rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.menu-btn.activo {
+  border-color: #0033cc;
+  background: #eef4ff;
 }
 
 .page-title {
@@ -328,6 +562,27 @@ onMounted(async () => {
   color: var(--color-text-muted);
 }
 
+.selector-grid {
+  margin-top: 0.8rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 0.45rem 0.85rem;
+}
+
+.selector-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.9rem;
+  color: var(--color-text);
+}
+
+.acciones-historico {
+  margin-top: 1rem;
+  display: flex;
+  justify-content: flex-end;
+}
+
 .tabla-card {
   padding: 0;
   overflow: hidden;
@@ -389,5 +644,82 @@ onMounted(async () => {
 .badge-abierto {
   background: rgba(220, 38, 38, 0.12);
   color: #b91c1c;
+}
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1100;
+  padding: 1rem;
+}
+
+.modal-ver-resultado {
+  max-width: 520px;
+  width: 100%;
+  max-height: min(560px, 85vh);
+  overflow-y: auto;
+  padding: 1.25rem 1.35rem;
+}
+
+.modal-title-reportes {
+  margin: 0 0 1rem;
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--color-secondary);
+}
+
+.bloque-resultado {
+  margin-bottom: 1rem;
+}
+
+.bloque-resultado-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--color-secondary);
+  margin: 0 0 0.35rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.bloque-resultado-texto {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.sin-resultado-msg {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+}
+
+.modal-acciones-reportes {
+  margin-top: 1rem;
+}
+
+.btn-resultado-tabla {
+  padding: 0.35rem 0.55rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  border-radius: 6px;
+  border: 1px solid var(--color-secondary);
+  background: #fff;
+  color: var(--color-secondary);
+  cursor: pointer;
+}
+
+.btn-resultado-tabla:hover {
+  background: #eef4ff;
+}
+
+.celda-sin-resultado {
+  color: var(--color-text-muted, #94a3b8);
+  font-size: 0.9rem;
 }
 </style>

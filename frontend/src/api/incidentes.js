@@ -30,11 +30,18 @@ export async function obtenerIncidentes(options = {}) {
 
 export async function guardarIncidente(datos) {
   const tipoInfo = TIPOS_INCIDENTE.find((t) => t.id === datos.tipo) || { nombre: datos.tipo, categoria: 'otro' }
+  const partesTipoNombre = [String(tipoInfo.nombre || datos.tipo || '').trim()].filter(Boolean)
+  if (datos.categoria_detalle) {
+    partesTipoNombre.push(`Categoría: ${String(datos.categoria_detalle).trim()}`)
+  }
+  if (datos.subcategoria_detalle) {
+    partesTipoNombre.push(`Subcategoría: ${String(datos.subcategoria_detalle).trim()}`)
+  }
   const payload = {
     tipo: datos.tipo,
-    tipo_nombre: tipoInfo.nombre,
+    tipo_nombre: partesTipoNombre.join(' | '),
     categoria: tipoInfo.categoria,
-    descripcion: datos.descripcion || '',
+    descripcion: '',
     lat: coordONull(datos.lat),
     lng: coordONull(datos.lng),
     municipio: datos.municipio || '',
@@ -63,8 +70,8 @@ export async function actualizarIncidente(id, datos) {
   return data
 }
 
-export async function cerrarIncidente(id) {
-  const { data } = await api.patch(`/api/incidentes/${id}/cerrar`)
+export async function cerrarIncidente(id, payload = {}) {
+  const { data } = await api.patch(`/api/incidentes/${id}/cerrar`, payload)
   return data
 }
 

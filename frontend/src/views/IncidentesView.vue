@@ -6,6 +6,7 @@
         {{ descargandoPdf ? 'Generando PDF…' : 'Descargar PDF' }}
       </button>
     </div>
+    <p v-if="avisoResultadoGuardado" class="aviso-resultado" role="status">{{ avisoResultadoGuardado }}</p>
 
     <div class="vista-por-estado card" role="tablist" aria-label="Filtrar listado por estado del incidente">
       <div class="vista-por-estado-inner">
@@ -126,7 +127,7 @@
         </div>
         <div class="form-group">
           <label>Buscar</label>
-          <input v-model="filtroTexto" type="text" class="input" placeholder="Descripción, tipo, municipio, parroquia o calle…" />
+          <input v-model="filtroTexto" type="text" class="input" placeholder="Tipo, municipio, parroquia o calle…" />
         </div>
       </div>
     </div>
@@ -136,22 +137,21 @@
         <table class="tabla">
           <thead>
             <tr>
-              <th>N°</th>
-              <th>Fecha</th>
+              <th class="th-n">N°</th>
+              <th class="th-fecha">Fecha</th>
               <th>Tipo</th>
               <th>Municipio</th>
               <th>Parroquia</th>
               <th>Calle / Avenida</th>
               <th>Estado</th>
-              <th>Descripción</th>
-              <th>Ubicación</th>
-              <th>Acciones</th>
+              <th v-if="vistaLista === 'cerrados'" class="th-resultado">Resultado</th>
+              <th class="th-acc">Acc.</th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="inc in incidentesFiltrados" :key="inc.id">
               <td>{{ numeroOrdenPorIncidente[inc.id] }}</td>
-              <td>{{ formatearFecha(inc.fecha) }}</td>
+              <td class="td-fecha">{{ formatearFechaTabla(inc.fecha) }}</td>
               <td>{{ inc.tipo_nombre || inc.tipo }}</td>
               <td>{{ inc.municipio || '—' }}</td>
               <td>{{ inc.parroquia || '—' }}</td>
@@ -161,54 +161,84 @@
                 <span v-else-if="textoEstadoListado(inc) === 'En proceso'" class="badge-estado badge-proceso">En proceso</span>
                 <span v-else class="badge-estado badge-abierto">Abierto</span>
               </td>
-              <td>{{ inc.descripcion || '—' }}</td>
-              <td>
-                <span v-if="inc.lat != null && inc.lng != null">{{ Number(inc.lat).toFixed(4) }}, {{ Number(inc.lng).toFixed(4) }}</span>
-                <span v-else>—</span>
+              <td v-if="vistaLista === 'cerrados'" class="td-resultado">
+                <button type="button" class="btn btn-resultado-tabla btn-sm" @click="abrirModalVerResultado(inc)">
+                  Resultado
+                </button>
               </td>
               <td class="acciones-cell">
-                <div class="acciones-btns">
+                <div class="acciones-btns" role="group" :aria-label="'Acciones incidente ' + (numeroOrdenPorIncidente[inc.id] ?? '')">
                   <button
+                    v-if="esEditable(inc)"
                     type="button"
-                    class="btn btn-secondary btn-sm"
-                    :disabled="!esEditable(inc)"
-                    :title="!esEditable(inc) ? motivoBloqueoEdicion(inc) : 'Editar incidente'"
+                    class="btn btn-icon btn-icon--editar"
+                    aria-label="Editar incidente"
+                    title="Editar"
                     @click="abrirEditar(inc)"
                   >
-                    Editar
+                    <svg class="btn-icon-svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                      <path fill="currentColor" d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1.003 1.003 0 0 0 0-1.42l-2.34-2.34a1.003 1.003 0 0 0-1.42 0l-1.83 1.83 3.75 3.75 1.84-1.82z" />
+                    </svg>
                   </button>
                   <button
                     v-if="inc.estado === 'abierto' && inc.cerrado !== true"
                     type="button"
-                    class="btn btn-proceso btn-sm"
+                    class="btn btn-icon btn-icon--proceso"
+                    :aria-label="cambiandoEstadoId === inc.id ? 'Aplicando en proceso' : 'Pasar a en proceso'"
+                    :title="cambiandoEstadoId === inc.id ? 'Aplicando…' : 'En proceso'"
                     :disabled="cambiandoEstadoId === inc.id || cerrandoId === inc.id"
                     @click="marcarEstadoOperativo(inc, 'en_proceso')"
                   >
-                    {{ cambiandoEstadoId === inc.id ? '…' : 'En proceso' }}
-                  </button>
-                  <button
-                    v-if="inc.estado === 'en_proceso' && inc.cerrado !== true"
-                    type="button"
-                    class="btn btn-secondary btn-sm"
-                    :disabled="cambiandoEstadoId === inc.id || cerrandoId === inc.id"
-                    @click="marcarEstadoOperativo(inc, 'abierto')"
-                  >
-                    {{ cambiandoEstadoId === inc.id ? '…' : 'Pasar a abierto' }}
+                    <svg
+                      v-if="cambiandoEstadoId === inc.id"
+                      class="btn-icon-svg btn-icon-svg--spin"
+                      viewBox="0 0 24 24"
+                      aria-hidden="true"
+                      focusable="false"
+                    >
+                      <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2.2" stroke-dasharray="32" stroke-linecap="round" opacity="0.35" />
+                      <path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" d="M12 3a9 9 0 0 1 9 9" />
+                    </svg>
+                    <svg v-else class="btn-icon-svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                      <path fill="currentColor" d="M8 5v14l11-7z" />
+                    </svg>
                   </button>
                   <button
                     v-if="inc.cerrado !== true"
                     type="button"
-                    class="btn btn-cerrar btn-sm"
+                    class="btn btn-icon btn-icon--cerrar"
+                    :aria-label="cerrandoId === inc.id ? 'Cerrando incidente' : 'Cerrar incidente'"
+                    :title="cerrandoId === inc.id ? 'Cerrando…' : 'Cerrar incidente'"
                     :disabled="cerrandoId === inc.id || cambiandoEstadoId === inc.id"
                     @click="confirmarCerrarDesdeFila(inc)"
                   >
-                    {{ cerrandoId === inc.id ? 'Cerrando…' : 'Cerrar incidente' }}
+                    <svg
+                      v-if="cerrandoId === inc.id"
+                      class="btn-icon-svg btn-icon-svg--spin"
+                      viewBox="0 0 24 24"
+                      aria-hidden="true"
+                      focusable="false"
+                    >
+                      <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2.2" stroke-dasharray="32" stroke-linecap="round" opacity="0.35" />
+                      <path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" d="M12 3a9 9 0 0 1 9 9" />
+                    </svg>
+                    <svg v-else class="btn-icon-svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                      <path
+                        fill="currentColor"
+                        d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"
+                      />
+                    </svg>
                   </button>
                 </div>
               </td>
             </tr>
           </tbody>
         </table>
+      </div>
+      <div class="leyenda-acciones" aria-label="Leyenda de colores de acciones">
+        <span class="leyenda-item"><span class="swatch swatch--editar" aria-hidden="true"></span> Editar</span>
+        <span class="leyenda-item"><span class="swatch swatch--proceso" aria-hidden="true"></span> Pasar a en proceso</span>
+        <span class="leyenda-item"><span class="swatch swatch--cerrar" aria-hidden="true"></span> Cerrar incidente</span>
       </div>
       <p v-if="incidentesFiltrados.length === 0" class="sin-datos">No hay incidentes que coincidan con los filtros.</p>
       <p class="total">Total: {{ incidentesFiltrados.length }} incidente(s)</p>
@@ -276,6 +306,71 @@
         </form>
       </div>
     </div>
+
+    <div
+      v-if="mostrarModalResultado"
+      class="modal-overlay modal-overlay--encima"
+      @click.self="cancelarModalResultado"
+    >
+      <div class="modal card modal-resultado" role="dialog" aria-labelledby="titulo-resultado">
+        <h3 id="titulo-resultado" class="modal-title">Resultado</h3>
+        <p class="resultado-ayuda">
+          Explique qué ocurrió con el caso (por ejemplo: reporte falso, duplicado, error, atención sin pasar por despacho,
+          o resultado final si ya hubo seguimiento). El incidente quedará <strong>cerrado</strong>.
+        </p>
+        <div class="form-group">
+          <label for="texto-resultado-cierre">Resultado</label>
+          <textarea
+            id="texto-resultado-cierre"
+            v-model="textoResultadoCierre"
+            class="input"
+            rows="4"
+            maxlength="4000"
+            :disabled="enviandoResultadoCierre"
+            placeholder="Escriba aquí…"
+          />
+        </div>
+        <p v-if="errorResultadoCierre" class="msg error">{{ errorResultadoCierre }}</p>
+        <div class="form-actions form-actions-resultado">
+          <button
+            type="button"
+            class="btn btn-primary"
+            :disabled="enviandoResultadoCierre"
+            @click="enviarResultadoCierre"
+          >
+            {{ enviandoResultadoCierre ? 'Guardando…' : 'Guardar' }}
+          </button>
+          <button
+            type="button"
+            class="btn btn-secondary"
+            :disabled="enviandoResultadoCierre"
+            @click="cancelarModalResultado"
+          >
+            Cancelar
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div
+      v-if="mostrarModalVerResultado"
+      class="modal-overlay modal-overlay--encima modal-overlay--ver-resultado"
+      @click.self="cerrarModalVerResultado"
+    >
+      <div class="modal card modal-ver-resultado" role="dialog" aria-labelledby="titulo-ver-resultado">
+        <h3 id="titulo-ver-resultado" class="modal-title">Resultado del incidente</h3>
+        <template v-if="incidenteVerResultado">
+          <div v-if="textoResultadoModalLeer(incidenteVerResultado)" class="bloque-resultado">
+            <p class="bloque-resultado-label">Resultado</p>
+            <p class="bloque-resultado-texto">{{ textoResultadoModalLeer(incidenteVerResultado) }}</p>
+          </div>
+          <p v-else class="sin-resultado-msg">No hay resultado registrado para este incidente.</p>
+        </template>
+        <div class="form-actions form-actions-resultado">
+          <button type="button" class="btn btn-secondary" @click="cerrarModalVerResultado">Cerrar</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -289,8 +384,9 @@ import {
   actualizarEstadoIncidente,
 } from '../api/incidentes'
 import { obtenerUbicacionInversa } from '../api/geocoding.js'
-import { TIPOS_INCIDENTE, MUNICIPIOS_CARABOBO, MAPA_CENTRO_CARABOBO } from '../config/incidentes'
+import { TIPOS_INCIDENTE, MUNICIPIOS_CARABOBO, MAPA_CENTRO_CARABOBO, PARROQUIAS_POR_MUNICIPIO } from '../config/incidentes'
 import { descargarPdfTablaIncidentes } from '../utils/pdfTablaIncidentes.js'
+import { etiquetaResultadoPdf, textoResultadoModalLeer } from '../utils/resultadoIncidente.js'
 
 const incidentes = ref([])
 const vistaLista = ref('abiertos')
@@ -317,6 +413,14 @@ const mensajeEditar = ref('')
 const mensajeEditarOk = ref(false)
 const descargandoPdf = ref(false)
 const logoPdfDataUrl = ref(null)
+const mostrarModalResultado = ref(false)
+const incidenteResultadoCierre = ref(null)
+const textoResultadoCierre = ref('')
+const errorResultadoCierre = ref('')
+const enviandoResultadoCierre = ref(false)
+const avisoResultadoGuardado = ref('')
+const mostrarModalVerResultado = ref(false)
+const incidenteVerResultado = ref(null)
 const ahoraMs = ref(Date.now())
 const listaFetchMs = ref(Date.now())
 let relojEdicion = null
@@ -402,12 +506,21 @@ const incidentesFiltrados = computed(() => {
 const parroquiasOpcionesFiltro = computed(() => {
   const set = new Set()
   const municipiosSeleccionados = filtroMunicipios.value
-  for (const inc of incidentes.value) {
-    const mun = inc.municipio || ''
-    const parroquia = inc.parroquia || ''
-    if (!parroquia) continue
-    if (municipiosSeleccionados.length > 0 && !municipiosSeleccionados.includes(mun)) continue
-    set.add(parroquia)
+  if (municipiosSeleccionados.length > 0) {
+    // Unión de parroquias de todos los municipios seleccionados.
+    for (const mun of municipiosSeleccionados) {
+      const parroquias = PARROQUIAS_POR_MUNICIPIO[mun] || []
+      for (const p of parroquias) {
+        if (p) set.add(p)
+      }
+    }
+  } else {
+    // Sin municipio seleccionado: mostrar catálogo completo para facilitar filtrado.
+    for (const parroquias of Object.values(PARROQUIAS_POR_MUNICIPIO)) {
+      for (const p of parroquias || []) {
+        if (p) set.add(p)
+      }
+    }
   }
   return Array.from(set).sort((a, b) => a.localeCompare(b, 'es'))
 })
@@ -471,6 +584,12 @@ function formatearFecha(fecha) {
   if (!fecha) return '—'
   const d = new Date(fecha)
   return d.toLocaleString('es-VE')
+}
+
+function formatearFechaTabla(fecha) {
+  if (!fecha) return '—'
+  const d = new Date(fecha)
+  return d.toLocaleString('es-VE', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })
 }
 
 function textoEstadoListado(inc) {
@@ -540,10 +659,7 @@ function descargarPdf() {
       inc.parroquia || '—',
       inc.via || '—',
       textoEstadoListado(inc),
-      inc.descripcion || '—',
-      inc.lat != null && inc.lng != null
-        ? `${Number(inc.lat).toFixed(4)}, ${Number(inc.lng).toFixed(4)}`
-        : '—',
+      etiquetaResultadoPdf(inc),
     ])
     const stamp = new Date().toISOString().slice(0, 19).replace(/[-:T]/g, '')
     descargarPdfTablaIncidentes({
@@ -670,54 +786,77 @@ async function marcarEstadoOperativo(inc, estado) {
   }
 }
 
-async function confirmarCerrarDesdeFila(inc) {
-  if (
-    !confirm(
-      '¿Cerrar este incidente? Dejará de mostrarse en el mapa en vivo hasta un nuevo registro.'
-    )
-  ) {
+function abrirModalResultado(inc) {
+  if (!inc) return
+  incidenteResultadoCierre.value = inc
+  textoResultadoCierre.value = ''
+  errorResultadoCierre.value = ''
+  mostrarModalResultado.value = true
+}
+
+function cancelarModalResultado() {
+  mostrarModalResultado.value = false
+  incidenteResultadoCierre.value = null
+  textoResultadoCierre.value = ''
+  errorResultadoCierre.value = ''
+}
+
+function abrirModalVerResultado(inc) {
+  incidenteVerResultado.value = inc
+  mostrarModalVerResultado.value = true
+}
+
+function cerrarModalVerResultado() {
+  mostrarModalVerResultado.value = false
+  incidenteVerResultado.value = null
+}
+
+async function enviarResultadoCierre() {
+  const inc = incidenteResultadoCierre.value
+  const t = textoResultadoCierre.value.trim()
+  if (!inc) return
+  if (!t) {
+    errorResultadoCierre.value = 'Escriba el resultado antes de guardar.'
     return
   }
+  if (inc.cerrado === true || inc.estado === 'cerrado') {
+    errorResultadoCierre.value = 'Este incidente ya está cerrado.'
+    return
+  }
+  enviandoResultadoCierre.value = true
+  errorResultadoCierre.value = ''
   cerrandoId.value = inc.id
   try {
-    await cerrarIncidente(inc.id)
+    await cerrarIncidente(inc.id, { resultado: t })
     aplicarListaIncidentesDesdeApi(await obtenerIncidentes())
+    cancelarModalResultado()
+    if (mostrarModal.value && editingId.value === inc.id) cerrarModal()
+    avisoResultadoGuardado.value = 'Incidente cerrado correctamente.'
+    window.setTimeout(() => {
+      avisoResultadoGuardado.value = ''
+    }, 8000)
   } catch (e) {
     let msg = 'No se pudo cerrar el incidente.'
     if (e.response && e.response.data && e.response.data.error) {
       msg = e.response.data.error
     }
-    alert(msg)
+    errorResultadoCierre.value = msg
   } finally {
+    enviandoResultadoCierre.value = false
     cerrandoId.value = null
   }
 }
 
-async function confirmarCerrarDesdeModal() {
+function confirmarCerrarDesdeFila(inc) {
+  abrirModalResultado(inc)
+}
+
+function confirmarCerrarDesdeModal() {
   const id = editingId.value
   if (id == null) return
-  if (
-    !confirm(
-      '¿Cerrar este incidente? Dejará de mostrarse en el mapa en vivo hasta un nuevo registro.'
-    )
-  ) {
-    return
-  }
-  cerrandoId.value = id
-  try {
-    await cerrarIncidente(id)
-    aplicarListaIncidentesDesdeApi(await obtenerIncidentes())
-    cerrarModal()
-  } catch (e) {
-    let msg = 'No se pudo cerrar el incidente.'
-    if (e.response && e.response.data && e.response.data.error) {
-      msg = e.response.data.error
-    }
-    mensajeEditar.value = msg
-    mensajeEditarOk.value = false
-  } finally {
-    cerrandoId.value = null
-  }
+  const inc = incidentes.value.find((i) => i.id === id)
+  if (!inc) return
+  abrirModalResultado(inc)
 }
 
 async function guardarEdicion() {
@@ -785,15 +924,21 @@ onUnmounted(() => {
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.35rem;
+  flex-shrink: 0;
+}
+.incidentes-view .filtros.card {
+  padding: 0.65rem 0.85rem;
+  margin-bottom: 0.4rem;
+  flex-shrink: 0;
 }
 .titulo-acciones .page-title {
   margin-bottom: 0;
 }
 .filtros-row {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 1rem;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 0.55rem 0.75rem;
 }
 .combo {
   position: relative;
@@ -887,42 +1032,147 @@ onUnmounted(() => {
   min-height: 0;
   display: flex;
   flex-direction: column;
+  padding: 0.6rem 0.75rem 0.5rem;
 }
 .tabla-wrap {
-  flex: 1;
-  min-height: 0;
+  flex: 1 1 0;
+  min-height: 8.5rem;
   overflow-x: auto;
   overflow-y: auto;
 }
 .tabla {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.9375rem;
+  font-size: 0.8125rem;
 }
 .tabla th,
 .tabla td {
-  padding: 0.75rem;
+  padding: 0.32rem 0.4rem;
   text-align: left;
   border-bottom: 1px solid #e2e8f0;
+  vertical-align: middle;
+  line-height: 1.3;
 }
 .tabla th {
   font-weight: 600;
+  font-size: 0.75rem;
   color: var(--color-secondary);
   background: #f8fafc;
 }
 .tabla td {
   color: var(--color-text);
 }
-.sin-datos {
-  padding: 1.5rem;
-  text-align: center;
-  color: var(--color-text-muted);
+.th-n {
+  width: 2.25rem;
 }
-.total {
-  padding: 0.75rem 1rem;
+.th-fecha {
+  width: 6.5rem;
+}
+.th-resultado {
+  width: 5.5rem;
+}
+.th-acc {
+  width: 3.1rem;
+}
+.td-fecha {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  font-size: 0.78rem;
+}
+.td-resultado {
+  white-space: nowrap;
+}
+.btn-resultado-tabla {
+  padding: 0.28rem 0.45rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  border-radius: 6px;
+  border: 1px solid var(--color-secondary);
+  background: #fff;
+  color: var(--color-secondary);
+  cursor: pointer;
+}
+.btn-resultado-tabla:hover {
+  background: #eef4ff;
+}
+.modal-overlay--ver-resultado {
+  z-index: 1120;
+}
+.modal-ver-resultado {
+  max-width: 520px;
+}
+.bloque-resultado {
+  margin-bottom: 1rem;
+}
+.bloque-resultado-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--color-secondary);
+  margin: 0 0 0.35rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.bloque-resultado-texto {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.sin-resultado-msg {
+  margin: 0;
   font-size: 0.875rem;
   color: var(--color-text-muted);
+}
+.sin-datos {
+  padding: 0.75rem 1rem;
+  text-align: center;
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+}
+.total {
+  padding: 0.4rem 0.1rem 0.15rem;
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
   border-top: 1px solid #e2e8f0;
+  flex-shrink: 0;
+}
+.leyenda-acciones {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1rem;
+  padding: 0.35rem 0.1rem 0.3rem;
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  border-bottom: 1px solid #e8edf3;
+  flex-shrink: 0;
+}
+.leyenda-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.swatch {
+  display: inline-block;
+  width: 1.15rem;
+  height: 1.15rem;
+  border-radius: 4px;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  /* relleno sólido en la leyenda (mismo criterio de color que los botones) */
+}
+.swatch--editar {
+  background: #0ea5e9;
+  border: 1px solid #0369a1;
+}
+.swatch--proceso {
+  background: #f97316;
+  border: 1px solid #c2410c;
+}
+.swatch--cerrar {
+  background: #f43f5e;
+  border: 1px solid #be123c;
 }
 .btn-sm {
   padding: 0.35rem 0.6rem;
@@ -930,9 +1180,74 @@ onUnmounted(() => {
 }
 .acciones-btns {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
+  flex-wrap: nowrap;
+  gap: 0.25rem;
   align-items: center;
+  justify-content: flex-end;
+}
+.acciones-cell {
+  width: 1%;
+  white-space: nowrap;
+  padding-left: 0.2rem;
+}
+.btn-icon {
+  min-width: 1.9rem;
+  min-height: 1.9rem;
+  width: 1.9rem;
+  height: 1.9rem;
+  padding: 0;
+  border-radius: 6px;
+  box-sizing: border-box;
+  flex-shrink: 0;
+}
+.btn-icon:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.btn-icon-svg {
+  display: block;
+  width: 1rem;
+  height: 1rem;
+}
+.btn-icon--editar {
+  /* Azul cielo: buen contraste con icono, sin mancha oscura en la tabla */
+  background: #e0f2fe;
+  color: #0369a1;
+  border: 1px solid #7dd3fc;
+  box-shadow: 0 1px 0 rgba(3, 105, 161, 0.08);
+}
+.btn-icon--editar:hover:not(:disabled) {
+  background: #bae6fd;
+  border-color: #38bdf8;
+  color: #0c4a6e;
+}
+.btn-icon--proceso {
+  border: 1px solid #fb923c;
+  color: #c2410c;
+  background: #fff7ed;
+  box-shadow: 0 1px 0 rgba(194, 65, 12, 0.06);
+}
+.btn-icon--proceso:hover:not(:disabled) {
+  background: #ffedd5;
+  border-color: #f97316;
+}
+.btn-icon--cerrar {
+  border: 1px solid #fb7185;
+  color: #be123c;
+  background: #fff1f2;
+  box-shadow: 0 1px 0 rgba(190, 18, 60, 0.06);
+}
+.btn-icon--cerrar:hover:not(:disabled) {
+  background: #ffe4e6;
+  border-color: #f43f5e;
+}
+.btn-icon-svg--spin {
+  animation: icon-spin-leyenda 0.7s linear infinite;
+}
+@keyframes icon-spin-leyenda {
+  to {
+    transform: rotate(360deg);
+  }
 }
 .btn-cerrar {
   border: 1px solid var(--color-primary);
@@ -943,11 +1258,16 @@ onUnmounted(() => {
   background: #fff5f5;
 }
 .badge-estado {
-  font-size: 0.75rem;
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 0.68rem;
   font-weight: 600;
-  padding: 0.2rem 0.5rem;
+  padding: 0.1rem 0.4rem;
   border-radius: 999px;
   white-space: nowrap;
+  vertical-align: middle;
 }
 .badge-abierto {
   background: #ecfdf5;
@@ -963,8 +1283,9 @@ onUnmounted(() => {
   color: #64748b;
 }
 .vista-por-estado {
-  margin-bottom: 0.75rem;
-  padding: 0.65rem 0.85rem;
+  margin-bottom: 0.45rem;
+  padding: 0.45rem 0.6rem;
+  flex-shrink: 0;
 }
 .vista-por-estado-inner {
   display: grid;
@@ -1037,6 +1358,34 @@ onUnmounted(() => {
   z-index: 1000;
   padding: 1rem;
 }
+.modal-overlay--encima {
+  z-index: 1100;
+}
+.modal-resultado {
+  max-width: 520px;
+}
+.resultado-ayuda {
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+  line-height: 1.45;
+  margin-bottom: 1rem;
+}
+.form-actions-resultado {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-top: 0.75rem;
+}
+.aviso-resultado {
+  margin: 0 0 0.65rem;
+  padding: 0.55rem 0.75rem;
+  font-size: 0.875rem;
+  line-height: 1.4;
+  color: #0c4a6e;
+  background: #e0f2fe;
+  border: 1px solid #7dd3fc;
+  border-radius: var(--radius);
+}
 .modal {
   max-width: 480px;
   width: 100%;
@@ -1082,13 +1431,15 @@ onUnmounted(() => {
   color: var(--color-text-muted, #64748b);
 }
 @media (max-width: 768px) {
+  .tabla th:nth-child(3),
+  .tabla td:nth-child(3),
+  .tabla th:nth-child(4),
+  .tabla td:nth-child(4),
+  .tabla th:nth-child(5),
+  .tabla td:nth-child(5),
   .tabla th:nth-child(6),
-  .tabla td:nth-child(6) { display: none; }
-  .tabla th:nth-child(7),
-  .tabla td:nth-child(7) { display: none; }
-  .tabla th:nth-child(8),
-  .tabla td:nth-child(8) { display: none; }
-  .tabla th:nth-child(9),
-  .tabla td:nth-child(9) { display: none; }
+  .tabla td:nth-child(6) {
+    display: none;
+  }
 }
 </style>

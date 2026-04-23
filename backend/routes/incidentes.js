@@ -4,7 +4,7 @@ import pool from '../db/connection.js'
 const router = Router()
 
 const SELECT_CAMPOS =
-  'id, tipo, tipo_nombre, categoria, descripcion, lat, lng, municipio, parroquia, via, fecha, cerrado, estado'
+  'id, tipo, tipo_nombre, categoria, descripcion, lat, lng, municipio, parroquia, via, fecha, cerrado, estado, resultado_cierre, observacion_cierre_abierto'
 
 function estadoDesdeFila(r) {
   const cerr = r.cerrado === 1 || r.cerrado === true
@@ -40,6 +40,9 @@ function mapRow(r) {
     fecha: r.fecha ? new Date(r.fecha).toISOString() : null,
     cerrado,
     estado,
+    resultado_cierre: r.resultado_cierre != null ? String(r.resultado_cierre) : '',
+    observacion_cierre_abierto:
+      r.observacion_cierre_abierto != null ? String(r.observacion_cierre_abierto) : '',
     segundos_desde_registro:
       r.segundos_desde_registro != null && r.segundos_desde_registro !== ''
         ? Number(r.segundos_desde_registro)
@@ -123,6 +126,12 @@ router.patch('/:id/estado', async (req, res) => {
     if (prev.cerrado === 1 || prev.cerrado === true) {
       return res.status(409).json({ error: 'No se puede cambiar el estado: el incidente está cerrado.' })
     }
+    const { estado: estActual } = estadoDesdeFila(prev)
+    if (siguiente === 'abierto' && estActual === 'en_proceso') {
+      return res.status(409).json({
+        error: 'No se puede volver a abierto: el incidente ya pasó a en proceso.',
+      })
+    }
     const [result] = await pool.query(
       'UPDATE incidentes SET estado = ?, cerrado = 0 WHERE id = ?',
       [siguiente, id]
@@ -142,9 +151,34 @@ router.patch('/:id/cerrar', async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10)
     if (isNaN(id)) return res.status(400).json({ error: 'Id inválido' })
-    const [result] = await pool.query(
-      `UPDATE incidentes SET cerrado = 1, estado = 'cerrado' WHERE id = ?`,
+    const resultado =
+      req.body.resultado != null ? String(req.body.resultado).trim() : ''
+    if (!resultado) {
+      return res.status(400).json({ error: 'Debe escribir el resultado del cierre.' })
+    }
+    if (resultado.length > 4000) {
+      return res.status(400).json({ error: 'El resultado no puede superar 4000 caracteres.' })
+    }
+    const [prevRows] = await pool.query(
+      'SELECT cerrado, estado FROM incidentes WHERE id = ?',
       [id]
+    )
+    if (!prevRows || prevRows.length === 0) {
+      return res.status(404).json({ error: 'Incidente no encontrado' })
+    }
+    const prev = prevRows[0]
+    if (prev.cerrado === 1 || prev.cerrado === true) {
+      return res.status(409).json({ error: 'El incidente ya está cerrado.' })
+    }
+    const { estado } = estadoDesdeFila(prev)
+    if (estado !== 'abierto' && estado !== 'en_proceso') {
+      return res.status(409).json({
+        error: 'Solo puede cerrar incidentes abiertos o en proceso.',
+      })
+    }
+    const [result] = await pool.query(
+      `UPDATE incidentes SET cerrado = 1, estado = 'cerrado', resultado_cierre = ? WHERE id = ?`,
+      [resultado, id]
     )
     if (result.affectedRows === 0) {
       return res.status(404).json({ error: 'Incidente no encontrado' })

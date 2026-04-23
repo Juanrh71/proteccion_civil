@@ -4,7 +4,7 @@
 
     <form @submit.prevent="enviar" class="form-registro card">
       <div class="form-col">
-        <div class="form-row">
+        <div class="form-row form-row-triple">
           <div class="form-group">
             <label>Tipo de incidente</label>
             <div class="combo" :class="{ 'combo-abierto': abrirTipo }">
@@ -29,12 +29,32 @@
                   role="option"
                   @mousedown.prevent="elegirTipo(t)"
                 >
-                  {{ t.nombre }}
+                  {{ nombreTipoVisible(t) }}
                 </li>
                 <li v-if="tiposFiltrados.length === 0" class="combo-vacio">Sin coincidencias</li>
               </ul>
             </div>
           </div>
+          <div class="form-group" v-if="mostrarCampoCategoria">
+            <label>Categoría</label>
+            <select v-model="form.categoria_detalle" class="input">
+              <option value="">Seleccione categoría</option>
+              <option v-for="c in categoriaOpcionesTipo" :key="c" :value="c">{{ c }}</option>
+            </select>
+          </div>
+          <div class="form-group" v-if="mostrarCampoSubcategoria">
+            <label>Subcategoría <span class="hint-opcional">(opcional)</span></label>
+            <input
+              v-model.trim="form.subcategoria_detalle"
+              type="text"
+              class="input"
+              maxlength="120"
+              placeholder="Ej.: poste principal, sector norte..."
+            />
+          </div>
+        </div>
+
+        <div class="form-row form-row-triple">
           <div class="form-group">
             <label>Municipio</label>
             <div class="combo" :class="{ 'combo-abierto': abrirMunicipio }">
@@ -65,9 +85,6 @@
               </ul>
             </div>
           </div>
-        </div>
-
-        <div class="form-row">
           <div class="form-group">
             <label>Parroquia</label>
             <select v-model="form.parroquia" class="input" :disabled="parroquiasDisponibles.length === 0">
@@ -91,11 +108,6 @@
         </div>
 
         <div class="form-group">
-          <label>Descripción</label>
-          <textarea v-model="form.descripcion" class="input descripcion-input" rows="2" placeholder="Detalles del incidente..."></textarea>
-        </div>
-
-        <div class="form-group">
           <label>Calle, avenida o referencia</label>
           <input v-model="form.via" type="text" class="input" maxlength="500" />
         </div>
@@ -105,9 +117,6 @@
           <div class="coords-row">
             <input v-model.number="form.lat" type="number" step="any" class="input" placeholder="Latitud" />
             <input v-model.number="form.lng" type="number" step="any" class="input" placeholder="Longitud" />
-            <button type="button" class="btn btn-secondary" @click="obtenerMiUbicacion" :disabled="ubicando">
-              {{ ubicando ? 'Obteniendo...' : 'Usar mi ubicación' }}
-            </button>
           </div>
         </div>
 
@@ -167,6 +176,22 @@ function normalizarBusqueda(s) {
     .replace(/\p{M}/gu, '')
 }
 
+function parseTipoOpciones(nombre) {
+  const s = String(nombre || '')
+  const m = s.match(/^(.*?)\s*\((.*?)\)\s*$/)
+  if (!m) return { base: s, opciones: [] }
+  const base = m[1].trim()
+  const opciones = m[2]
+    .split(',')
+    .map((x) => x.trim())
+    .filter(Boolean)
+  return { base, opciones }
+}
+
+function nombreTipoVisible(t) {
+  return parseTipoOpciones(t?.nombre).base || t?.nombre || ''
+}
+
 const tipoQuery = ref('')
 const municipioQuery = ref('')
 const abrirTipo = ref(false)
@@ -176,11 +201,16 @@ const tiposFiltrados = computed(() => {
   const q = normalizarBusqueda(tipoQuery.value.trim())
   if (!q) return TIPOS_INCIDENTE
   return TIPOS_INCIDENTE.filter((t) => {
-    const nombre = normalizarBusqueda(t.nombre)
+    const nombre = normalizarBusqueda(nombreTipoVisible(t))
     const id = normalizarBusqueda(String(t.id))
     return nombre.includes(q) || id.includes(q)
   })
 })
+
+const tipoSeleccionado = computed(() => TIPOS_INCIDENTE.find((t) => t.id === form.value.tipo) || null)
+const categoriaOpcionesTipo = computed(() => parseTipoOpciones(tipoSeleccionado.value?.nombre).opciones)
+const mostrarCampoCategoria = computed(() => categoriaOpcionesTipo.value.length > 0)
+const mostrarCampoSubcategoria = computed(() => !!form.value.categoria_detalle)
 
 const municipiosFiltrados = computed(() => {
   const q = normalizarBusqueda(municipioQuery.value.trim())
@@ -202,7 +232,7 @@ function onTipoBlur() {
     abrirTipo.value = false
     if (form.value.tipo) {
       const sel = TIPOS_INCIDENTE.find((t) => t.id === form.value.tipo)
-      if (sel) tipoQuery.value = sel.nombre
+      if (sel) tipoQuery.value = nombreTipoVisible(sel)
       return
     }
     const lista = tiposFiltrados.value
@@ -211,7 +241,7 @@ function onTipoBlur() {
       return
     }
     const exact = TIPOS_INCIDENTE.find(
-      (t) => normalizarBusqueda(t.nombre) === normalizarBusqueda(tipoQuery.value.trim())
+      (t) => normalizarBusqueda(nombreTipoVisible(t)) === normalizarBusqueda(tipoQuery.value.trim())
     )
     if (exact) elegirTipo(exact)
   }, 180)
@@ -219,7 +249,9 @@ function onTipoBlur() {
 
 function elegirTipo(t) {
   form.value.tipo = t.id
-  tipoQuery.value = t.nombre
+  tipoQuery.value = nombreTipoVisible(t)
+  form.value.categoria_detalle = ''
+  form.value.subcategoria_detalle = ''
   abrirTipo.value = false
 }
 
@@ -235,7 +267,7 @@ function onTipoKeydown(e) {
     elegirTipo(list[0])
   } else if (list.length > 1) {
     const q = normalizarBusqueda(tipoQuery.value.trim())
-    const exact = list.find((t) => normalizarBusqueda(t.nombre) === q)
+    const exact = list.find((t) => normalizarBusqueda(nombreTipoVisible(t)) === q)
     if (exact) {
       e.preventDefault()
       elegirTipo(exact)
@@ -301,9 +333,10 @@ let secuenciaReverseRegistrar = 0
 
 const form = ref({
   tipo: '',
+  categoria_detalle: '',
+  subcategoria_detalle: '',
   municipio: '',
   parroquia: '',
-  descripcion: '',
   via: '',
   lat: null,
   lng: null,
@@ -331,10 +364,19 @@ watch(tipoQuery, (q) => {
   if (!form.value.tipo) return
   const sel = TIPOS_INCIDENTE.find((t) => t.id === form.value.tipo)
   if (!sel) return
-  if (normalizarBusqueda((q || '').trim()) !== normalizarBusqueda(sel.nombre)) {
+  if (normalizarBusqueda((q || '').trim()) !== normalizarBusqueda(nombreTipoVisible(sel))) {
     form.value.tipo = ''
+    form.value.categoria_detalle = ''
+    form.value.subcategoria_detalle = ''
   }
 })
+
+watch(
+  () => form.value.categoria_detalle,
+  (cat) => {
+    if (!cat) form.value.subcategoria_detalle = ''
+  }
+)
 
 watch(municipioQuery, (q) => {
   if (!form.value.municipio) return
@@ -353,7 +395,6 @@ watch(
 )
 
 const enviando = ref(false)
-const ubicando = ref(false)
 const mensaje = ref('')
 const mensajeOk = ref(false)
 
@@ -410,37 +451,13 @@ async function asignarCoordenadas(coords) {
   await aplicarReverseDesdeCoordenadasRegistrar(coords.lat, coords.lng, label)
 }
 
-function obtenerMiUbicacion() {
-  if (!navigator.geolocation) {
-    mensaje.value = 'Su navegador no soporta geolocalización.'
-    mensajeOk.value = false
-    return
-  }
-  ubicando.value = true
-  mensaje.value = ''
-  navigator.geolocation.getCurrentPosition(
-    async (pos) => {
-      form.value.lat = pos.coords.latitude
-      form.value.lng = pos.coords.longitude
-      await aplicarReverseDesdeCoordenadasRegistrar(form.value.lat, form.value.lng, '')
-      ubicando.value = false
-      mensaje.value = 'Ubicación obtenida correctamente.'
-      mensajeOk.value = true
-    },
-    () => {
-      ubicando.value = false
-      mensaje.value = 'No se pudo obtener la ubicación. Puede registrar sin coordenadas o intentar de nuevo.'
-      mensajeOk.value = false
-    }
-  )
-}
-
 function limpiar() {
   form.value = {
     tipo: '',
+    categoria_detalle: '',
+    subcategoria_detalle: '',
     municipio: '',
     parroquia: '',
-    descripcion: '',
     via: '',
     lat: null,
     lng: null,
@@ -463,9 +480,10 @@ async function enviar() {
   try {
     await guardarIncidente({
       tipo: form.value.tipo,
+      categoria_detalle: form.value.categoria_detalle,
+      subcategoria_detalle: form.value.subcategoria_detalle,
       municipio: form.value.municipio,
       parroquia: form.value.parroquia,
-      descripcion: form.value.descripcion,
       via: form.value.via,
       lat: form.value.lat,
       lng: form.value.lng,
@@ -492,7 +510,8 @@ async function enviar() {
 
 <style scoped>
 .registrar-view {
-  max-width: 1220px;
+  width: 100%;
+  max-width: none;
   height: 100%;
   display: flex;
   flex-direction: column;
@@ -505,7 +524,7 @@ async function enviar() {
   flex: 1;
   overflow: hidden;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(320px, 42%);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   column-gap: 1rem;
   padding: 0.75rem;
 }
@@ -524,6 +543,9 @@ async function enviar() {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 0.6rem;
+}
+.form-row-triple {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .combo {
@@ -631,10 +653,6 @@ async function enviar() {
   margin-top: 0.25rem;
   font-size: 0.9375rem;
 }
-.descripcion-input {
-  min-height: 62px;
-  resize: vertical;
-}
 .msg.ok { color: var(--color-success); }
 .msg.error { color: var(--color-primary); }
 .hint-opcional {
@@ -659,6 +677,9 @@ async function enviar() {
 
 @media (max-width: 600px) {
   .form-row {
+    grid-template-columns: 1fr;
+  }
+  .form-row-triple {
     grid-template-columns: 1fr;
   }
 }

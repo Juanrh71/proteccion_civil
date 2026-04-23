@@ -4,19 +4,23 @@ USE proteccion_civil_carabobo;
 
 CREATE TABLE IF NOT EXISTS incidentes (
   id INT AUTO_INCREMENT PRIMARY KEY,
-  tipo VARCHAR(80) NOT NULL,
-  tipo_nombre VARCHAR(255) NOT NULL,
-  categoria VARCHAR(50) NOT NULL DEFAULT 'otro',
-  descripcion TEXT,
-  lat DECIMAL(10, 6) DEFAULT NULL,
-  lng DECIMAL(10, 6) DEFAULT NULL,
-  municipio VARCHAR(80) DEFAULT NULL,
-  parroquia VARCHAR(80) DEFAULT NULL,
-  via VARCHAR(500) DEFAULT NULL COMMENT 'calle, avenida o referencia',
-  fecha DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  cerrado TINYINT(1) NOT NULL DEFAULT 0 COMMENT '1 = cerrado (sincronizado con estado=cerrado)',
-  estado VARCHAR(20) NOT NULL DEFAULT 'abierto' COMMENT 'abierto | en_proceso | cerrado',
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  id_tipo INT NOT NULL,
+  nombre_incidente VARCHAR(100) NOT NULL,
+  categoria VARCHAR(100) NOT NULL,
+  descripcion TEXT DEFAULT NULL,
+  afectados ENUM('No', 'Heridos', 'Muertos') DEFAULT 'No',
+  lat DECIMAL(10,8) DEFAULT NULL,
+  lng DECIMAL(10,8) DEFAULT NULL,
+  municipio VARCHAR(100) DEFAULT NULL,
+  parroquia VARCHAR(100) DEFAULT NULL,
+  via VARCHAR(100) DEFAULT NULL,
+  estatus_incidente ENUM('nuevo', 'en_proceso', 'culminado') DEFAULT 'nuevo',
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  fecha_cierre DATETIME DEFAULT NULL,
+  id_de_reportante INT NOT NULL,
+  tipo_de_reportante ENUM('ciudadano', 'oficial') NOT NULL,
+  evidencia_visual VARCHAR(255) DEFAULT NULL,
+  procedencia ENUM('movil', '') DEFAULT ''
 );
 
 CREATE TABLE IF NOT EXISTS usuarios (
@@ -26,6 +30,47 @@ CREATE TABLE IF NOT EXISTS usuarios (
   correo VARCHAR(255) NOT NULL UNIQUE,
   cedula VARCHAR(20) NOT NULL UNIQUE,
   telefono VARCHAR(20) NOT NULL,
+  rol ENUM('civil', 'oficial', 'admin') NOT NULL DEFAULT 'civil',
+  estatus ENUM('activo', 'inactivo') NOT NULL DEFAULT 'activo',
   password_hash VARCHAR(255) NOT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS categorias_incidentes (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  nombre VARCHAR(100) NOT NULL,
+  emergencia ENUM('Si', 'No') DEFAULT 'Si'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS tipos_de_incidentes (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  nombre VARCHAR(100) NOT NULL,
+  id_categoria INT NOT NULL,
+  CONSTRAINT fk_categoria_catalogo
+    FOREIGN KEY (id_categoria) REFERENCES categorias_incidentes(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS reportes_edan (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  id_oficial INT,
+  municipio VARCHAR(100),
+  parroquia VARCHAR(100),
+  sector VARCHAR(100),
+  condicion_vivienda ENUM('afectada', 'alto_riesgo', 'destruida'),
+  tipo_vivienda VARCHAR(100),
+  total_personas INT,
+  necesidades_insumos TEXT,
+  lat DECIMAL(10,8),
+  lng DECIMAL(10,8),
+  fecha_afectacion DATETIME,
+  CONSTRAINT fk_reportes_edan_usuario
+    FOREIGN KEY (id_oficial) REFERENCES usuarios(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+ALTER TABLE incidentes
+  ADD CONSTRAINT fk_tipo_catalogo
+  FOREIGN KEY (id_tipo) REFERENCES tipos_de_incidentes(id);
+
+ALTER TABLE incidentes
+  ADD CONSTRAINT fk_reportante_inc
+  FOREIGN KEY (id_de_reportante) REFERENCES usuarios(id);
