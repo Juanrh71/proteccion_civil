@@ -1,5 +1,6 @@
 import { ref, computed } from 'vue'
 import * as authApi from '../api/auth'
+import { cargarCatalogoIncidentes } from './useCatalogoIncidentes.js'
 
 const token = ref(authApi.getToken())
 const usuario = ref(authApi.getUsuario())
@@ -11,6 +12,7 @@ export function useAuth() {
     const data = await authApi.login(correo, password)
     token.value = authApi.getToken()
     usuario.value = authApi.getUsuario()
+    await cargarCatalogoIncidentes()
     return data
   }
 
@@ -30,6 +32,7 @@ export function useAuth() {
     authApi.logout()
     token.value = null
     usuario.value = null
+    cargarCatalogoIncidentes()
   }
 
   function initFromStorage() {

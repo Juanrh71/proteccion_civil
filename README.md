@@ -54,7 +54,7 @@ Los datos se guardan en **MySQL** a través del backend. El frontend consume la 
 
 - **Ubicación:** carpeta `backend/`
 - **Stack:** Node.js, Express, MySQL (XAMPP)
-- Crear la base de datos con `backend/db/schema.sql`, configurar `.env` y ejecutar `npm install` y `npm run dev` dentro de `backend/`. Ver `backend/README.md`.
+- Crear/reemplazar la base con `backend/db/proteccion_civil_carabobo.sql` (hace un `DROP DATABASE` y recrea TODO), luego configurar `.env` y ejecutar `npm install` y `npm run dev` dentro de `backend/`. Ver `backend/README.md`.
 
 ---
 

@@ -93,6 +93,12 @@ export const TIPOS_INCIDENTE = [
 export const MAPA_CENTRO_CARABOBO = { lat: 10.1801, lng: -68.0039 }
 export const MAPA_ZOOM_DEFAULT = 10
 
+/** Esquina SO y NE del estado Carabobo (aprox.) para encuadrar todo el estado en el mapa */
+export const MAPA_BOUNDS_CARABOBO = [
+  [9.95, -68.55],
+  [10.48, -67.32],
+]
+
 export const MUNICIPIOS_CARABOBO = [
   'Valencia', 'Naguanagua', 'San Diego', 'Guacara', 'Mariara', 'Diego Ibarra',
   'Puerto Cabello', 'Juan José Mora', 'Bejuma', 'Miranda', 'Montalbán', 'Carlos Arvelo',

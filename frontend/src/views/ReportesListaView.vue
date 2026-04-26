@@ -3,6 +3,7 @@
     <div class="titulo-acciones">
       <h1 class="page-title">Reportes</h1>
     </div>
+    <p v-if="errorCarga" class="reportes-error" role="alert">{{ errorCarga }}</p>
 
     <section class="menu-reportes card">
       <button
@@ -60,7 +61,7 @@
           <table class="tabla">
             <thead>
               <tr>
-                <th>N°</th>
+                <th title="Número de reporte (ID del sistema)">N°</th>
                 <th>Fecha</th>
                 <th>Tipo</th>
                 <th>Municipio</th>
@@ -71,8 +72,8 @@
               </tr>
             </thead>
             <tbody>
-              <tr v-for="(inc, idx) in lista" :key="inc.id">
-                <td>{{ idx + 1 }}</td>
+              <tr v-for="inc in lista" :key="inc.id">
+                <td>{{ inc.id != null ? inc.id : '—' }}</td>
                 <td>{{ formatearFecha(inc.fecha) }}</td>
                 <td>{{ inc.tipo_nombre || inc.tipo }}</td>
                 <td>{{ inc.municipio || '—' }}</td>
@@ -138,6 +139,23 @@
           </button>
         </div>
       </section>
+
+      <section class="card comparativa-viz-card">
+        <h2 class="comparativa-viz-titulo">{{ tituloGraficoComparativa }}</h2>
+        <p v-if="!comparativaChartData" class="comparativa-viz-hint">
+          Seleccione al menos 2
+          {{ modoComparativa === 'meses' ? 'meses' : 'años' }} para ver el gráfico (mismos datos que el PDF).
+        </p>
+        <div v-else class="comparativa-chart-box">
+          <Bar :data="comparativaChartData" :options="comparativaChartOptions" />
+        </div>
+        <p v-if="comparativaChartData && modoComparativa === 'meses'" class="comparativa-viz-sub">
+          Año base: <strong>{{ anioComparativa }}</strong> · total incidentes en los meses seleccionados: {{ totalComparativaSeleccion }}
+        </p>
+        <p v-else-if="comparativaChartData && modoComparativa === 'anios'" class="comparativa-viz-sub">
+          Total en años seleccionados: {{ totalComparativaSeleccion }}
+        </p>
+      </section>
     </template>
 
     <div
@@ -148,11 +166,34 @@
       <div class="modal-ver-resultado card" role="dialog" aria-labelledby="titulo-ver-resultado-reportes">
         <h3 id="titulo-ver-resultado-reportes" class="modal-title-reportes">Resultado del incidente</h3>
         <template v-if="incidenteVerResultado">
+          <div v-if="tieneRegistroVictimasCierre(incidenteVerResultado)" class="bloque-resultado bloque-victimas-readonly">
+            <p class="bloque-resultado-label">Heridos y fallecidos (cierre tras en proceso)</p>
+            <table class="tabla-victimas-cierre tabla-victimas-cierre--lectura">
+              <tbody>
+                <tr>
+                  <th scope="row">Heridos</th>
+                  <td>{{ incidenteVerResultado.heridos_cierre }}</td>
+                </tr>
+                <tr>
+                  <th scope="row">Fallecidos</th>
+                  <td>{{ incidenteVerResultado.fallecidos_cierre }}</td>
+                </tr>
+              </tbody>
+            </table>
+            <p v-if="textoVictimasCierre(incidenteVerResultado)" class="victimas-resumen-texto">
+              {{ textoVictimasCierre(incidenteVerResultado) }}
+            </p>
+          </div>
           <div v-if="textoResultadoModalLeer(incidenteVerResultado)" class="bloque-resultado">
             <p class="bloque-resultado-label">Resultado</p>
             <p class="bloque-resultado-texto">{{ textoResultadoModalLeer(incidenteVerResultado) }}</p>
           </div>
-          <p v-else class="sin-resultado-msg">No hay resultado registrado para este incidente.</p>
+          <p
+            v-if="!textoResultadoModalLeer(incidenteVerResultado) && !tieneRegistroVictimasCierre(incidenteVerResultado)"
+            class="sin-resultado-msg"
+          >
+            No hay resultado registrado para este incidente.
+          </p>
         </template>
         <div class="modal-acciones-reportes">
           <button type="button" class="btn btn-secondary" @click="cerrarModalVerResultado">Cerrar</button>
@@ -164,15 +205,32 @@
 
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  BarController,
+  Tooltip,
+  Legend,
+} from 'chart.js'
+import { Bar } from 'vue-chartjs'
 import { obtenerIncidentes } from '../api/incidentes'
 import { descargarPdfTablaIncidentes } from '../utils/pdfTablaIncidentes.js'
-import { etiquetaResultadoPdf, textoResultadoModalLeer } from '../utils/resultadoIncidente.js'
+import {
+  etiquetaResultadoPdf,
+  textoResultadoModalLeer,
+  textoVictimasCierre,
+  tieneRegistroVictimasCierre,
+} from '../utils/resultadoIncidente.js'
 import { descargarPdfComparativaHistorica } from '../utils/pdfComparativaHistorica.js'
 import {
   RANGO_ANO_INICIO,
   RANGO_ANO_FIN,
   añoSugeridoParaIncidentes,
 } from '../config/incidentes'
+
+ChartJS.register(CategoryScale, LinearScale, BarElement, BarController, Tooltip, Legend)
 
 const MESES = [
   'Enero',
@@ -203,6 +261,7 @@ const anioComparativa = ref(añoSugeridoParaIncidentes())
 const mesesSeleccionados = ref([new Date().getMonth() + 1])
 const aniosSeleccionados = ref([añoSugeridoParaIncidentes()])
 const descargandoPdfHistorico = ref(false)
+const errorCarga = ref('')
 
 const anos = computed(() => {
   const list = []
@@ -317,8 +376,8 @@ function descargarPdf() {
   if (rows.length === 0) return
   descargandoPdf.value = true
   try {
-    const filas = rows.map((inc, idx) => [
-      String(idx + 1),
+    const filas = rows.map((inc) => [
+      String(inc.id != null ? inc.id : '—'),
       formatearFecha(inc.fecha),
       inc.tipo_nombre || inc.tipo || '—',
       inc.municipio || '—',
@@ -384,6 +443,76 @@ function contarPorAnio(anio) {
   return total
 }
 
+const comparativaChartData = computed(() => {
+  if (modoComparativa.value === 'meses') {
+    const meses = [...mesesSeleccionados.value].sort((a, b) => a - b)
+    if (meses.length < 2) return null
+    const anio = anioComparativa.value
+    const vals = meses.map((m) => contarPorMes(anio, m))
+    return {
+      labels: meses.map((m) => MESES[m - 1]),
+      datasets: [
+        {
+          label: 'Incidentes',
+          data: vals,
+          backgroundColor: 'rgba(0, 51, 204, 0.85)',
+          borderRadius: 6,
+        },
+      ],
+    }
+  }
+  const anios = [...aniosSeleccionados.value].sort((a, b) => a - b)
+  if (anios.length < 2) return null
+  const vals = anios.map((y) => contarPorAnio(y))
+  return {
+    labels: anios.map((y) => String(y)),
+    datasets: [
+      {
+        label: 'Incidentes',
+        data: vals,
+        backgroundColor: 'rgba(0, 51, 204, 0.85)',
+        borderRadius: 6,
+      },
+    ],
+  }
+})
+
+const tituloGraficoComparativa = computed(() => {
+  if (modoComparativa.value === 'meses') {
+    return 'Comparativa por meses'
+  }
+  return 'Comparativa por años'
+})
+
+const totalComparativaSeleccion = computed(() => {
+  const d = comparativaChartData.value
+  if (!d || !d.datasets[0]?.data) return 0
+  return d.datasets[0].data.reduce((a, b) => a + (Number(b) || 0), 0)
+})
+
+const comparativaChartOptions = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: {
+    legend: { display: false },
+    tooltip: {
+      backgroundColor: 'rgba(15, 23, 42, 0.92)',
+      padding: 10,
+      cornerRadius: 8,
+    },
+  },
+  scales: {
+    x: {
+      grid: { color: 'rgba(226, 232, 240, 0.9)' },
+    },
+    y: {
+      beginAtZero: true,
+      ticks: { precision: 0 },
+      grid: { color: 'rgba(226, 232, 240, 0.9)' },
+    },
+  },
+}
+
 function descargarPdfHistorico() {
   try {
     descargandoPdfHistorico.value = true
@@ -430,7 +559,12 @@ function descargarPdfHistorico() {
 }
 
 onMounted(async () => {
-  incidentes.value = await obtenerIncidentes()
+  try {
+    incidentes.value = await obtenerIncidentes()
+    errorCarga.value = ''
+  } catch (e) {
+    errorCarga.value = e?.message || 'No se pudieron cargar los incidentes.'
+  }
   if (!aniosDisponiblesComparativa.value.includes(anioComparativa.value)) {
     anioComparativa.value = aniosDisponiblesComparativa.value[0] || añoSugeridoParaIncidentes()
   }
@@ -445,6 +579,15 @@ onMounted(async () => {
 <style scoped>
 .reportes-lista-view {
   max-width: 1400px;
+}
+.reportes-error {
+  margin: 0 0 0.75rem;
+  padding: 0.55rem 0.75rem;
+  font-size: 0.875rem;
+  color: #7f1d1d;
+  background: #fee2e2;
+  border: 1px solid #fecaca;
+  border-radius: var(--radius, 6px);
 }
 
 .titulo-acciones {
@@ -583,6 +726,38 @@ onMounted(async () => {
   justify-content: flex-end;
 }
 
+.comparativa-viz-titulo {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--color-secondary);
+  margin: 0 0 0.65rem;
+}
+
+.comparativa-viz-hint {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  color: var(--color-text-muted);
+}
+
+.comparativa-viz-sub {
+  margin: 0.75rem 0 0;
+  font-size: 0.88rem;
+  color: var(--color-text-muted);
+}
+
+.comparativa-viz-sub strong {
+  color: var(--color-secondary);
+  font-weight: 600;
+}
+
+.comparativa-chart-box {
+  position: relative;
+  height: min(360px, 70vh);
+  min-height: 220px;
+  margin-top: 0.5rem;
+}
+
 .tabla-card {
   padding: 0;
   overflow: hidden;
@@ -691,6 +866,35 @@ onMounted(async () => {
   line-height: 1.45;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+.tabla-victimas-cierre {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.tabla-victimas-cierre th,
+.tabla-victimas-cierre td {
+  padding: 0.5rem 0.65rem;
+  border: 1px solid #e2e8f0;
+  text-align: left;
+}
+.tabla-victimas-cierre--lectura th {
+  width: 42%;
+  background: #f8fafc;
+  font-weight: 600;
+}
+.bloque-victimas-readonly {
+  margin-bottom: 1rem;
+}
+.victimas-resumen-texto {
+  margin: 0.5rem 0 0;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+  line-height: 1.4;
 }
 
 .sin-resultado-msg {

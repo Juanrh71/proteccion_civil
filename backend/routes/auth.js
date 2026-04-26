@@ -13,6 +13,17 @@ const telefonoRegex = /^04\d{9}$/
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
+function estatusEsActivo(estatusRaw) {
+  const est = String(estatusRaw || '')
+    .trim()
+    .toLowerCase()
+  return est === 'activo' || est === 'aprobado' || est === 'pendiente'
+}
+
+function estatusUiDesdeDb(estatusRaw) {
+  return estatusEsActivo(estatusRaw) ? 'activo' : 'inactivo'
+}
+
 function authTokenDesdeHeader(req) {
   const auth = req.headers.authorization || ''
   if (!auth.startsWith('Bearer ')) return null
@@ -27,7 +38,7 @@ async function requireAdmin(req, res, next) {
     const [rows] = await pool.query('SELECT id, rol, estatus FROM usuarios WHERE id = ?', [payload.id])
     if (!rows.length) return res.status(401).json({ error: 'No autorizado.' })
     const u = rows[0]
-    if (u.estatus !== 'activo') return res.status(403).json({ error: 'Usuario inactivo.' })
+    if (!estatusEsActivo(u.estatus)) return res.status(403).json({ error: 'Usuario inactivo.' })
     if (u.rol !== 'admin') return res.status(403).json({ error: 'Acceso solo para administrador.' })
     req.authUser = { id: u.id, rol: u.rol }
     next()
@@ -92,7 +103,7 @@ router.post('/registro', requireAdmin, async (req, res) => {
     await pool.query(
       `INSERT INTO usuarios
        (nombre, apellido, correo, cedula, telefono, rol, estatus, password_hash)
-       VALUES (?, ?, ?, ?, ?, ?, 'activo', ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, 'aprobado', ?)`,
       [nombre, apellido, correo, cedula, telefono, rol, password_hash]
     )
     res.status(201).json({ message: 'Usuario registrado correctamente.' })
@@ -108,13 +119,19 @@ router.get('/usuarios', requireAdmin, async (req, res) => {
     let sql =
       'SELECT id, nombre, apellido, correo, cedula, telefono, rol, estatus, created_at FROM usuarios'
     const params = []
-    if (estatus === 'activo' || estatus === 'inactivo') {
-      sql += ' WHERE estatus = ?'
-      params.push(estatus)
+    if (estatus === 'activo') {
+      sql += " WHERE estatus IN ('activo', 'aprobado')"
+    } else if (estatus === 'inactivo') {
+      sql += " WHERE estatus IN ('inactivo', 'bloqueado', 'pendiente')"
     }
     sql += ' ORDER BY created_at DESC'
     const [rows] = await pool.query(sql, params)
-    res.json(rows)
+    res.json(
+      rows.map((u) => ({
+        ...u,
+        estatus: estatusUiDesdeDb(u.estatus),
+      }))
+    )
   } catch (err) {
     console.error(err)
     res.status(500).json({ error: 'Error al consultar usuarios.' })
@@ -132,7 +149,8 @@ router.patch('/usuarios/:id/estatus', requireAdmin, async (req, res) => {
     if (id === req.authUser.id) {
       return res.status(400).json({ error: 'No puede cambiar su propio estatus.' })
     }
-    const [result] = await pool.query('UPDATE usuarios SET estatus = ? WHERE id = ?', [estatus, id])
+    const estatusDb = estatus === 'activo' ? 'aprobado' : 'bloqueado'
+    const [result] = await pool.query('UPDATE usuarios SET estatus = ? WHERE id = ?', [estatusDb, id])
     if (result.affectedRows === 0) {
       return res.status(404).json({ error: 'Usuario no encontrado.' })
     }
@@ -163,7 +181,7 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ error: 'Credenciales incorrectas.' })
     }
     const user = rows[0]
-    if (user.estatus === 'inactivo') {
+    if (!estatusEsActivo(user.estatus)) {
       return res.status(403).json({ error: 'Usuario inactivo. Contacte al administrador.' })
     }
     const match = await bcrypt.compare(password, user.password_hash)
@@ -186,7 +204,7 @@ router.post('/login', async (req, res) => {
         cedula: user.cedula,
         telefono: user.telefono,
         rol: user.rol,
-        estatus: user.estatus,
+        estatus: estatusUiDesdeDb(user.estatus),
       },
     })
   } catch (err) {

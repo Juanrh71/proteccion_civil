@@ -90,19 +90,53 @@ const GRUPO_POR_TIPO = {
   derrame_de_hidrocarburo: 'eliminacion_peligro',
 }
 
+/** Id de categoría Excel (columna / agrupación del libro) para un id de tipo */
+export function grupoExcelDeTipoId(tipoId) {
+  const tipo = String(tipoId || '').trim()
+  return GRUPO_POR_TIPO[tipo] || 'otro'
+}
+
+/** Rellena useCatalogoIncidentes tras cargar /api/catalogo/registro (slug -> color) */
+let coloresCategoriasDinamicos = null
+export function setColoresCategoriasDinamicos(map) {
+  coloresCategoriasDinamicos =
+    map && typeof map === 'object' ? { ...map } : null
+}
+
+function categoriaDinamicaConocida(slug) {
+  const c = String(slug || '').trim()
+  if (!c) return false
+  return !!(coloresCategoriasDinamicos && Object.prototype.hasOwnProperty.call(coloresCategoriasDinamicos, c))
+}
+
 export function grupoExcelDeIncidente(inc) {
   if (!inc) return 'otro'
-  const tipo = String(inc.tipo || '').trim()
-  return GRUPO_POR_TIPO[tipo] || 'otro'
+  const c = inc.categoria != null ? String(inc.categoria).trim() : ''
+  if (c && Object.prototype.hasOwnProperty.call(GRUPOS_EXCEL, c)) {
+    return c
+  }
+  if (c && categoriaDinamicaConocida(c)) {
+    return c
+  }
+  return grupoExcelDeTipoId(inc.tipo)
 }
 
 export function colorGrupoExcel(inc) {
   const g = grupoExcelDeIncidente(inc)
+  const din = coloresCategoriasDinamicos && coloresCategoriasDinamicos[g]
+  if (din) return din
   return GRUPOS_EXCEL[g]?.color || GRUPOS_EXCEL.otro.color
+}
+
+let nombresCategoriasDinamicos = null
+export function setNombresCategoriasDinamicos(map) {
+  nombresCategoriasDinamicos = map && typeof map === 'object' ? { ...map } : null
 }
 
 export function nombreGrupoExcel(inc) {
   const g = grupoExcelDeIncidente(inc)
+  const n = nombresCategoriasDinamicos && nombresCategoriasDinamicos[g]
+  if (n) return n
   return GRUPOS_EXCEL[g]?.nombre || GRUPOS_EXCEL.otro.nombre
 }
 
@@ -111,3 +145,6 @@ export const LEYENDA_GRUPOS_EXCEL = Object.entries(GRUPOS_EXCEL).map(([id, meta]
   nombre: meta.nombre,
   color: meta.color,
 }))
+
+/** Orden de categorías tal como en el catálogo Excel / leyenda */
+export const CATEGORIAS_EXCEL_REGISTRO = LEYENDA_GRUPOS_EXCEL.map((e) => e.id)

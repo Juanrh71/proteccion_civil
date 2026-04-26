@@ -11,10 +11,14 @@
 <script setup>
 import AppHeader from './components/AppHeader.vue'
 import AppFooter from './components/AppFooter.vue'
-import { computed } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
+import { cargarCatalogoIncidentes } from './composables/useCatalogoIncidentes.js'
 
 const route = useRoute()
+onMounted(() => {
+  cargarCatalogoIncidentes()
+})
 const scrollPrincipal = computed(
   () => route.name === 'Dashboard' || route.name === 'Reportes' || route.name === 'Usuarios'
 )

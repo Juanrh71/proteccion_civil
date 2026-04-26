@@ -6,13 +6,23 @@
       <div class="form-col">
         <div class="form-row form-row-triple">
           <div class="form-group">
+            <label>Categoría</label>
+            <select v-model="form.categoria_grupo" class="input" aria-label="Categoría de incidente">
+              <option value="">Seleccione categoría</option>
+              <option v-for="c in categoriasSelect" :key="c.id" :value="c.id">
+                {{ c.nombre }}
+              </option>
+            </select>
+          </div>
+          <div class="form-group">
             <label>Tipo de incidente</label>
-            <div class="combo" :class="{ 'combo-abierto': abrirTipo }">
+            <div class="combo" :class="{ 'combo-abierto': abrirTipo, 'combo-disabled': !form.categoria_grupo }">
               <input
                 v-model="tipoQuery"
                 type="text"
                 class="combo-input"
-                placeholder="Escriba para buscar y elija…"
+                :disabled="!form.categoria_grupo"
+                :placeholder="form.categoria_grupo ? 'Escriba para buscar y elija…' : 'Seleccione una categoría arriba'"
                 autocomplete="off"
                 aria-autocomplete="list"
                 :aria-expanded="abrirTipo"
@@ -21,7 +31,7 @@
                 @keydown="onTipoKeydown"
               />
               <span class="combo-chevron" aria-hidden="true" />
-              <ul v-show="abrirTipo" class="combo-lista" role="listbox">
+              <ul v-show="abrirTipo && form.categoria_grupo" class="combo-lista" role="listbox">
                 <li
                   v-for="t in tiposFiltrados"
                   :key="t.id"
@@ -31,16 +41,11 @@
                 >
                   {{ nombreTipoVisible(t) }}
                 </li>
-                <li v-if="tiposFiltrados.length === 0" class="combo-vacio">Sin coincidencias</li>
+                <li v-if="tiposFiltrados.length === 0" class="combo-vacio">
+                  {{ form.categoria_grupo ? 'Sin coincidencias' : 'Seleccione categoría' }}
+                </li>
               </ul>
             </div>
-          </div>
-          <div class="form-group" v-if="mostrarCampoCategoria">
-            <label>Categoría</label>
-            <select v-model="form.categoria_detalle" class="input">
-              <option value="">Seleccione categoría</option>
-              <option v-for="c in categoriaOpcionesTipo" :key="c" :value="c">{{ c }}</option>
-            </select>
           </div>
           <div class="form-group" v-if="mostrarCampoSubcategoria">
             <label>Subcategoría <span class="hint-opcional">(opcional)</span></label>
@@ -150,6 +155,12 @@
 import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import MapaCarabobo from '../components/MapaCarabobo.vue'
 import { TIPOS_INCIDENTE, MUNICIPIOS_CARABOBO, MAPA_CENTRO_CARABOBO, PARROQUIAS_POR_MUNICIPIO } from '../config/incidentes'
+import {
+  GRUPOS_EXCEL,
+  CATEGORIAS_EXCEL_REGISTRO,
+  grupoExcelDeTipoId,
+} from '../utils/clasificacionExcelIncidentes.js'
+import { useCatalogoIncidentes } from '../composables/useCatalogoIncidentes'
 import { guardarIncidente } from '../api/incidentes'
 import { obtenerUbicacionInversa } from '../api/geocoding.js'
 
@@ -192,25 +203,58 @@ function nombreTipoVisible(t) {
   return parseTipoOpciones(t?.nombre).base || t?.nombre || ''
 }
 
+const { categorias, tiposPlano } = useCatalogoIncidentes()
+
+const tiposActivosLista = computed(() => {
+  if (categorias.value.length > 0) {
+    return tiposPlano.value
+  }
+  return TIPOS_INCIDENTE.map((t) => ({
+    id: t.id,
+    nombre: t.nombre,
+    categoria: grupoExcelDeTipoId(t.id),
+  }))
+})
+
+const categoriasSelect = computed(() => {
+  if (categorias.value.length > 0) {
+    return categorias.value.map((c) => ({ id: c.slug, nombre: c.nombre }))
+  }
+  return CATEGORIAS_EXCEL_REGISTRO.map((gid) => ({
+    id: gid,
+    nombre: GRUPOS_EXCEL[gid]?.nombre || String(gid),
+  }))
+})
+
+function categoriaDeTipoId(tid) {
+  const t = tiposActivosLista.value.find((x) => x.id === tid)
+  if (t) return t.categoria
+  return grupoExcelDeTipoId(tid)
+}
+
 const tipoQuery = ref('')
 const municipioQuery = ref('')
 const abrirTipo = ref(false)
 const abrirMunicipio = ref(false)
 
+const tiposEnCategoria = computed(() => {
+  const g = form.value.categoria_grupo
+  if (!g) return []
+  return tiposActivosLista.value.filter((t) => t.categoria === g)
+})
+
 const tiposFiltrados = computed(() => {
+  const base = tiposEnCategoria.value
   const q = normalizarBusqueda(tipoQuery.value.trim())
-  if (!q) return TIPOS_INCIDENTE
-  return TIPOS_INCIDENTE.filter((t) => {
+  if (!q) return base
+  return base.filter((t) => {
     const nombre = normalizarBusqueda(nombreTipoVisible(t))
     const id = normalizarBusqueda(String(t.id))
     return nombre.includes(q) || id.includes(q)
   })
 })
 
-const tipoSeleccionado = computed(() => TIPOS_INCIDENTE.find((t) => t.id === form.value.tipo) || null)
-const categoriaOpcionesTipo = computed(() => parseTipoOpciones(tipoSeleccionado.value?.nombre).opciones)
-const mostrarCampoCategoria = computed(() => categoriaOpcionesTipo.value.length > 0)
-const mostrarCampoSubcategoria = computed(() => !!form.value.categoria_detalle)
+const mostrarCampoSubcategoria = computed(() => !!form.value.tipo)
 
 const municipiosFiltrados = computed(() => {
   const q = normalizarBusqueda(municipioQuery.value.trim())
@@ -219,6 +263,7 @@ const municipiosFiltrados = computed(() => {
 })
 
 function onTipoFocus(e) {
+  if (!form.value.categoria_grupo) return
   abrirTipo.value = true
   abrirMunicipio.value = false
   nextTick(() => {
@@ -231,7 +276,7 @@ function onTipoBlur() {
   setTimeout(() => {
     abrirTipo.value = false
     if (form.value.tipo) {
-      const sel = TIPOS_INCIDENTE.find((t) => t.id === form.value.tipo)
+      const sel = tiposActivosLista.value.find((t) => t.id === form.value.tipo)
       if (sel) tipoQuery.value = nombreTipoVisible(sel)
       return
     }
@@ -240,7 +285,7 @@ function onTipoBlur() {
       elegirTipo(lista[0])
       return
     }
-    const exact = TIPOS_INCIDENTE.find(
+    const exact = tiposActivosLista.value.find(
       (t) => normalizarBusqueda(nombreTipoVisible(t)) === normalizarBusqueda(tipoQuery.value.trim())
     )
     if (exact) elegirTipo(exact)
@@ -250,7 +295,6 @@ function onTipoBlur() {
 function elegirTipo(t) {
   form.value.tipo = t.id
   tipoQuery.value = nombreTipoVisible(t)
-  form.value.categoria_detalle = ''
   form.value.subcategoria_detalle = ''
   abrirTipo.value = false
 }
@@ -332,8 +376,8 @@ function onMunicipioKeydown(e) {
 let secuenciaReverseRegistrar = 0
 
 const form = ref({
+  categoria_grupo: '',
   tipo: '',
-  categoria_detalle: '',
   subcategoria_detalle: '',
   municipio: '',
   parroquia: '',
@@ -362,19 +406,21 @@ onUnmounted(() => {
 
 watch(tipoQuery, (q) => {
   if (!form.value.tipo) return
-  const sel = TIPOS_INCIDENTE.find((t) => t.id === form.value.tipo)
+  const sel = tiposActivosLista.value.find((t) => t.id === form.value.tipo)
   if (!sel) return
   if (normalizarBusqueda((q || '').trim()) !== normalizarBusqueda(nombreTipoVisible(sel))) {
     form.value.tipo = ''
-    form.value.categoria_detalle = ''
     form.value.subcategoria_detalle = ''
   }
 })
 
 watch(
-  () => form.value.categoria_detalle,
-  (cat) => {
-    if (!cat) form.value.subcategoria_detalle = ''
+  () => form.value.categoria_grupo,
+  () => {
+    form.value.tipo = ''
+    form.value.subcategoria_detalle = ''
+    tipoQuery.value = ''
+    abrirTipo.value = false
   }
 )
 
@@ -411,6 +457,7 @@ const puntoUnico = computed(() => {
       lat: form.value.lat,
       lng: form.value.lng,
       tipo_nombre: 'Ubicación seleccionada',
+      tipo: 'otro',
       categoria: 'otro',
     }]
   }
@@ -453,8 +500,8 @@ async function asignarCoordenadas(coords) {
 
 function limpiar() {
   form.value = {
+    categoria_grupo: '',
     tipo: '',
-    categoria_detalle: '',
     subcategoria_detalle: '',
     municipio: '',
     parroquia: '',
@@ -470,17 +517,31 @@ function limpiar() {
 }
 
 async function enviar() {
+  if (!form.value.categoria_grupo) {
+    mensaje.value = 'Seleccione la categoría.'
+    mensajeOk.value = false
+    return
+  }
   if (!form.value.tipo) {
     mensaje.value = 'Seleccione el tipo de incidente.'
     mensajeOk.value = false
     return
   }
+  if (categoriaDeTipoId(form.value.tipo) !== form.value.categoria_grupo) {
+    mensaje.value = 'El tipo no corresponde a la categoría elegida. Vuelva a seleccionar.'
+    mensajeOk.value = false
+    return
+  }
+  const catSel = categoriasSelect.value.find((c) => c.id === form.value.categoria_grupo)
+  const tipoSel = tiposActivosLista.value.find((t) => t.id === form.value.tipo)
   enviando.value = true
   mensaje.value = ''
   try {
     await guardarIncidente({
       tipo: form.value.tipo,
-      categoria_detalle: form.value.categoria_detalle,
+      grupo_excel_id: form.value.categoria_grupo,
+      tipo_nombre_base: nombreTipoVisible(tipoSel) || (tipoSel && tipoSel.nombre) || String(form.value.tipo),
+      categoria_nombre: catSel ? catSel.nombre : '',
       subcategoria_detalle: form.value.subcategoria_detalle,
       municipio: form.value.municipio,
       parroquia: form.value.parroquia,
@@ -559,6 +620,13 @@ async function enviar() {
 .combo-abierto {
   border-color: var(--color-secondary, #334155);
   box-shadow: 0 0 0 2px rgba(51, 65, 85, 0.12);
+}
+.combo-disabled {
+  opacity: 0.72;
+  background: #f8fafc;
+}
+.combo-disabled .combo-input:disabled {
+  cursor: not-allowed;
 }
 .combo-input {
   width: 100%;

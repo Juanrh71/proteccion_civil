@@ -7,6 +7,7 @@
       </button>
     </div>
     <p v-if="avisoResultadoGuardado" class="aviso-resultado" role="status">{{ avisoResultadoGuardado }}</p>
+    <p v-if="errorCargaLista" class="aviso-lista-error" role="alert">{{ errorCargaLista }}</p>
 
     <div class="vista-por-estado card" role="tablist" aria-label="Filtrar listado por estado del incidente">
       <div class="vista-por-estado-inner">
@@ -55,7 +56,7 @@
           <label>Tipo</label>
           <select v-model="filtroTipo" class="input">
             <option value="">Todos</option>
-            <option v-for="t in TIPOS_INCIDENTE" :key="t.id" :value="t.id">{{ t.nombre }}</option>
+            <option v-for="t in tiposFiltroOpciones" :key="t.id" :value="t.id">{{ t.nombre }}</option>
           </select>
         </div>
         <div class="form-group">
@@ -137,7 +138,7 @@
         <table class="tabla">
           <thead>
             <tr>
-              <th class="th-n">N°</th>
+              <th class="th-n" title="Número de reporte (ID del sistema)">N°</th>
               <th class="th-fecha">Fecha</th>
               <th>Tipo</th>
               <th>Municipio</th>
@@ -150,7 +151,7 @@
           </thead>
           <tbody>
             <tr v-for="inc in incidentesFiltrados" :key="inc.id">
-              <td>{{ numeroOrdenPorIncidente[inc.id] }}</td>
+              <td>{{ inc.id != null ? inc.id : '—' }}</td>
               <td class="td-fecha">{{ formatearFechaTabla(inc.fecha) }}</td>
               <td>{{ inc.tipo_nombre || inc.tipo }}</td>
               <td>{{ inc.municipio || '—' }}</td>
@@ -167,7 +168,7 @@
                 </button>
               </td>
               <td class="acciones-cell">
-                <div class="acciones-btns" role="group" :aria-label="'Acciones incidente ' + (numeroOrdenPorIncidente[inc.id] ?? '')">
+                <div class="acciones-btns" role="group" :aria-label="'Acciones incidente ' + (inc.id != null ? inc.id : '')">
                   <button
                     v-if="esEditable(inc)"
                     type="button"
@@ -235,10 +236,32 @@
           </tbody>
         </table>
       </div>
-      <div class="leyenda-acciones" aria-label="Leyenda de colores de acciones">
-        <span class="leyenda-item"><span class="swatch swatch--editar" aria-hidden="true"></span> Editar</span>
-        <span class="leyenda-item"><span class="swatch swatch--proceso" aria-hidden="true"></span> Pasar a en proceso</span>
-        <span class="leyenda-item"><span class="swatch swatch--cerrar" aria-hidden="true"></span> Cerrar incidente</span>
+      <div class="leyenda-acciones" aria-label="Leyenda: qué hace cada icono de la columna Acc.">
+        <span class="leyenda-titulo">Leyenda de acciones</span>
+        <span class="leyenda-item">
+          <span class="leyenda-icon-muestra btn-icon btn-icon--editar" aria-hidden="true">
+            <svg class="btn-icon-svg" viewBox="0 0 24 24" focusable="false">
+              <path fill="currentColor" d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1.003 1.003 0 0 0 0-1.42l-2.34-2.34a1.003 1.003 0 0 0-1.42 0l-1.83 1.83 3.75 3.75 1.84-1.82z" />
+            </svg>
+          </span>
+          Editar
+        </span>
+        <span class="leyenda-item">
+          <span class="leyenda-icon-muestra btn-icon btn-icon--proceso" aria-hidden="true">
+            <svg class="btn-icon-svg" viewBox="0 0 24 24" focusable="false">
+              <path fill="currentColor" d="M8 5v14l11-7z" />
+            </svg>
+          </span>
+          Pasar a en proceso
+        </span>
+        <span class="leyenda-item">
+          <span class="leyenda-icon-muestra btn-icon btn-icon--cerrar" aria-hidden="true">
+            <svg class="btn-icon-svg" viewBox="0 0 24 24" focusable="false">
+              <path fill="currentColor" d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+            </svg>
+          </span>
+          Cerrar incidente
+        </span>
       </div>
       <p v-if="incidentesFiltrados.length === 0" class="sin-datos">No hay incidentes que coincidan con los filtros.</p>
       <p class="total">Total: {{ incidentesFiltrados.length }} incidente(s)</p>
@@ -246,7 +269,7 @@
 
     <div v-if="mostrarModal" class="modal-overlay" @click.self="cerrarModal">
       <div class="modal modal-editar card">
-        <h3 class="modal-title">Editar reporte N° {{ editingNumeroReporte }}</h3>
+        <h3 class="modal-title">Editar reporte N° {{ editingId }}</h3>
         <form @submit.prevent="guardarEdicion" class="form-editar">
           <div class="form-group">
             <label>Tipo de incidente</label>
@@ -314,10 +337,55 @@
     >
       <div class="modal card modal-resultado" role="dialog" aria-labelledby="titulo-resultado">
         <h3 id="titulo-resultado" class="modal-title">Resultado</h3>
-        <p class="resultado-ayuda">
-          Explique qué ocurrió con el caso (por ejemplo: reporte falso, duplicado, error, atención sin pasar por despacho,
-          o resultado final si ya hubo seguimiento). El incidente quedará <strong>cerrado</strong>.
+        <p v-if="cierreDesdeEnProceso" class="resultado-ayuda">
+          Este incidente estuvo <strong>en proceso</strong>. Indique heridos y/o fallecidos (use 0 si no hubo) y describa el
+          resultado. El incidente quedará <strong>cerrado</strong>.
         </p>
+        <p v-else class="resultado-ayuda">
+          Cierre directo desde <strong>abierto</strong> (p. ej. duplicado o falso). Explique el motivo. No se registran
+          víctimas en este tipo de cierre. El incidente quedará <strong>cerrado</strong>.
+        </p>
+        <div v-if="cierreDesdeEnProceso" class="form-group tabla-victimas-wrap">
+          <label class="tabla-victimas-label">Personas afectadas</label>
+          <table class="tabla-victimas-cierre" aria-label="Heridos y fallecidos al cierre">
+            <thead>
+              <tr>
+                <th scope="col">Concepto</th>
+                <th scope="col">Cantidad</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Heridos</td>
+                <td>
+                  <input
+                    v-model.number="heridosCierreForm"
+                    type="number"
+                    min="0"
+                    max="999999"
+                    class="input input-num-cierre"
+                    :disabled="enviandoResultadoCierre"
+                    aria-label="Número de heridos"
+                  />
+                </td>
+              </tr>
+              <tr>
+                <td>Fallecidos</td>
+                <td>
+                  <input
+                    v-model.number="fallecidosCierreForm"
+                    type="number"
+                    min="0"
+                    max="999999"
+                    class="input input-num-cierre"
+                    :disabled="enviandoResultadoCierre"
+                    aria-label="Número de fallecidos"
+                  />
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
         <div class="form-group">
           <label for="texto-resultado-cierre">Resultado</label>
           <textarea
@@ -360,11 +428,34 @@
       <div class="modal card modal-ver-resultado" role="dialog" aria-labelledby="titulo-ver-resultado">
         <h3 id="titulo-ver-resultado" class="modal-title">Resultado del incidente</h3>
         <template v-if="incidenteVerResultado">
+          <div v-if="tieneRegistroVictimasCierre(incidenteVerResultado)" class="bloque-resultado bloque-victimas-readonly">
+            <p class="bloque-resultado-label">Heridos y fallecidos (cierre tras en proceso)</p>
+            <table class="tabla-victimas-cierre tabla-victimas-cierre--lectura">
+              <tbody>
+                <tr>
+                  <th scope="row">Heridos</th>
+                  <td>{{ incidenteVerResultado.heridos_cierre }}</td>
+                </tr>
+                <tr>
+                  <th scope="row">Fallecidos</th>
+                  <td>{{ incidenteVerResultado.fallecidos_cierre }}</td>
+                </tr>
+              </tbody>
+            </table>
+            <p v-if="textoVictimasCierre(incidenteVerResultado)" class="victimas-resumen-texto">
+              {{ textoVictimasCierre(incidenteVerResultado) }}
+            </p>
+          </div>
           <div v-if="textoResultadoModalLeer(incidenteVerResultado)" class="bloque-resultado">
             <p class="bloque-resultado-label">Resultado</p>
             <p class="bloque-resultado-texto">{{ textoResultadoModalLeer(incidenteVerResultado) }}</p>
           </div>
-          <p v-else class="sin-resultado-msg">No hay resultado registrado para este incidente.</p>
+          <p
+            v-if="!textoResultadoModalLeer(incidenteVerResultado) && !tieneRegistroVictimasCierre(incidenteVerResultado)"
+            class="sin-resultado-msg"
+          >
+            No hay resultado registrado para este incidente.
+          </p>
         </template>
         <div class="form-actions form-actions-resultado">
           <button type="button" class="btn btn-secondary" @click="cerrarModalVerResultado">Cerrar</button>
@@ -385,8 +476,23 @@ import {
 } from '../api/incidentes'
 import { obtenerUbicacionInversa } from '../api/geocoding.js'
 import { TIPOS_INCIDENTE, MUNICIPIOS_CARABOBO, MAPA_CENTRO_CARABOBO, PARROQUIAS_POR_MUNICIPIO } from '../config/incidentes'
+import { useCatalogoIncidentes } from '../composables/useCatalogoIncidentes'
 import { descargarPdfTablaIncidentes } from '../utils/pdfTablaIncidentes.js'
-import { etiquetaResultadoPdf, textoResultadoModalLeer } from '../utils/resultadoIncidente.js'
+import {
+  etiquetaResultadoPdf,
+  textoResultadoModalLeer,
+  textoVictimasCierre,
+  tieneRegistroVictimasCierre,
+} from '../utils/resultadoIncidente.js'
+
+const { categorias, tiposPlano } = useCatalogoIncidentes()
+
+const tiposFiltroOpciones = computed(() => {
+  if (categorias.value.length > 0) {
+    return tiposPlano.value.map((t) => ({ id: t.id, nombre: t.nombre }))
+  }
+  return TIPOS_INCIDENTE.map((t) => ({ id: t.id, nombre: t.nombre }))
+})
 
 const incidentes = ref([])
 const vistaLista = ref('abiertos')
@@ -400,7 +506,6 @@ const abrirMunicipios = ref(false)
 const abrirParroquias = ref(false)
 const mostrarModal = ref(false)
 const editingId = ref(null)
-const editingNumeroReporte = ref(0)
 const tipoEdicionFijo = ref('')
 const tipoEdicionNombre = ref('')
 const fechaEdicionFija = ref('')
@@ -416,9 +521,14 @@ const logoPdfDataUrl = ref(null)
 const mostrarModalResultado = ref(false)
 const incidenteResultadoCierre = ref(null)
 const textoResultadoCierre = ref('')
+const heridosCierreForm = ref(0)
+const fallecidosCierreForm = ref(0)
 const errorResultadoCierre = ref('')
 const enviandoResultadoCierre = ref(false)
+
+const cierreDesdeEnProceso = computed(() => incidenteResultadoCierre.value?.estado === 'en_proceso')
 const avisoResultadoGuardado = ref('')
+const errorCargaLista = ref('')
 const mostrarModalVerResultado = ref(false)
 const incidenteVerResultado = ref(null)
 const ahoraMs = ref(Date.now())
@@ -432,24 +542,6 @@ const formEditar = ref({
   via: '',
   lat: null,
   lng: null,
-})
-
-const numeroOrdenPorIncidente = computed(() => {
-  const lista = []
-  for (let i = 0; i < incidentes.value.length; i++) {
-    lista.push(incidentes.value[i])
-  }
-  lista.sort(function (a, b) {
-    const ta = a.fecha ? new Date(a.fecha).getTime() : Number.MAX_SAFE_INTEGER
-    const tb = b.fecha ? new Date(b.fecha).getTime() : Number.MAX_SAFE_INTEGER
-    if (ta !== tb) return ta - tb
-    return (a.id || 0) - (b.id || 0)
-  })
-  const map = {}
-  for (let j = 0; j < lista.length; j++) {
-    map[lista[j].id] = j + 1
-  }
-  return map
 })
 
 function incPerteneceAVista(inc, vista) {
@@ -652,7 +744,7 @@ function descargarPdf() {
   descargandoPdf.value = true
   try {
     const filas = incidentesFiltrados.value.map((inc) => [
-      String(numeroOrdenPorIncidente.value[inc.id] ?? ''),
+      String(inc.id != null ? inc.id : '—'),
       formatearFecha(inc.fecha),
       inc.tipo_nombre || inc.tipo || '—',
       inc.municipio || '—',
@@ -684,7 +776,6 @@ function abrirEditar(inc) {
     return
   }
   editingId.value = inc.id
-  editingNumeroReporte.value = numeroOrdenPorIncidente.value[inc.id] ?? 0
   tipoEdicionFijo.value = inc.tipo ? inc.tipo : ''
   tipoEdicionNombre.value = inc.tipo_nombre || inc.tipo || '—'
   fechaEdicionFija.value = formatearFecha(inc.fecha)
@@ -761,7 +852,6 @@ async function asignarCoordenadasEdicion(coords) {
 function cerrarModal() {
   mostrarModal.value = false
   editingId.value = null
-  editingNumeroReporte.value = 0
   tipoEdicionFijo.value = ''
   tipoEdicionNombre.value = ''
   fechaEdicionFija.value = ''
@@ -775,6 +865,7 @@ async function marcarEstadoOperativo(inc, estado) {
   try {
     await actualizarEstadoIncidente(inc.id, estado)
     aplicarListaIncidentesDesdeApi(await obtenerIncidentes())
+    errorCargaLista.value = ''
   } catch (e) {
     let msg = 'No se pudo actualizar el estado.'
     if (e.response && e.response.data && e.response.data.error) {
@@ -790,6 +881,8 @@ function abrirModalResultado(inc) {
   if (!inc) return
   incidenteResultadoCierre.value = inc
   textoResultadoCierre.value = ''
+  heridosCierreForm.value = 0
+  fallecidosCierreForm.value = 0
   errorResultadoCierre.value = ''
   mostrarModalResultado.value = true
 }
@@ -798,6 +891,8 @@ function cancelarModalResultado() {
   mostrarModalResultado.value = false
   incidenteResultadoCierre.value = null
   textoResultadoCierre.value = ''
+  heridosCierreForm.value = 0
+  fallecidosCierreForm.value = 0
   errorResultadoCierre.value = ''
 }
 
@@ -827,8 +922,16 @@ async function enviarResultadoCierre() {
   errorResultadoCierre.value = ''
   cerrandoId.value = inc.id
   try {
-    await cerrarIncidente(inc.id, { resultado: t })
+    const payload = { resultado: t }
+    if (inc.estado === 'en_proceso') {
+      const h = Number(heridosCierreForm.value)
+      const f = Number(fallecidosCierreForm.value)
+      payload.heridos_cierre = Number.isFinite(h) && h >= 0 ? Math.min(999999, Math.floor(h)) : 0
+      payload.fallecidos_cierre = Number.isFinite(f) && f >= 0 ? Math.min(999999, Math.floor(f)) : 0
+    }
+    await cerrarIncidente(inc.id, payload)
     aplicarListaIncidentesDesdeApi(await obtenerIncidentes())
+    errorCargaLista.value = ''
     cancelarModalResultado()
     if (mostrarModal.value && editingId.value === inc.id) cerrarModal()
     avisoResultadoGuardado.value = 'Incidente cerrado correctamente.'
@@ -868,8 +971,11 @@ async function guardarEdicion() {
   guardando.value = true
   mensajeEditar.value = ''
   try {
+    const incBase = incidentes.value.find((i) => i.id === editingId.value)
     const payload = {
       tipo: tipoEdicionFijo.value,
+      grupo_excel_id: incBase?.categoria,
+      tipo_nombre_sugerido: tipoEdicionNombre.value,
       municipio: formEditar.value.municipio,
       descripcion: formEditar.value.descripcion,
       via: formEditar.value.via,
@@ -878,6 +984,7 @@ async function guardarEdicion() {
     }
     await actualizarIncidente(editingId.value, payload)
     aplicarListaIncidentesDesdeApi(await obtenerIncidentes())
+    errorCargaLista.value = ''
     cerrarModal()
   } catch (e) {
     let msg = 'Error al guardar. Intente de nuevo.'
@@ -896,7 +1003,12 @@ function aplicarListaIncidentesDesdeApi(data) {
 }
 
 onMounted(async () => {
-  aplicarListaIncidentesDesdeApi(await obtenerIncidentes())
+  try {
+    aplicarListaIncidentesDesdeApi(await obtenerIncidentes())
+    errorCargaLista.value = ''
+  } catch (e) {
+    errorCargaLista.value = e?.message || 'No se pudo cargar el listado.'
+  }
   logoPdfDataUrl.value = await cargarLogoBase64()
   relojEdicion = setInterval(() => {
     ahoraMs.value = Date.now()
@@ -1141,38 +1253,31 @@ onUnmounted(() => {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.75rem 1rem;
-  padding: 0.35rem 0.1rem 0.3rem;
+  gap: 0.5rem 1rem;
+  padding: 0.5rem 0.1rem 0.35rem;
   font-size: 0.75rem;
   color: var(--color-text-muted);
   border-bottom: 1px solid #e8edf3;
   flex-shrink: 0;
 }
+.leyenda-titulo {
+  flex-basis: 100%;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #64748b;
+  margin: 0;
+}
 .leyenda-item {
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
+  gap: 0.4rem;
 }
-.swatch {
-  display: inline-block;
-  width: 1.15rem;
-  height: 1.15rem;
-  border-radius: 4px;
+.leyenda-icon-muestra {
+  pointer-events: none;
+  cursor: default;
   flex-shrink: 0;
-  box-sizing: border-box;
-  /* relleno sólido en la leyenda (mismo criterio de color que los botones) */
-}
-.swatch--editar {
-  background: #0ea5e9;
-  border: 1px solid #0369a1;
-}
-.swatch--proceso {
-  background: #f97316;
-  border: 1px solid #c2410c;
-}
-.swatch--cerrar {
-  background: #f43f5e;
-  border: 1px solid #be123c;
 }
 .btn-sm {
   padding: 0.35rem 0.6rem;
@@ -1370,6 +1475,51 @@ onUnmounted(() => {
   line-height: 1.45;
   margin-bottom: 1rem;
 }
+.tabla-victimas-wrap {
+  margin-bottom: 1rem;
+}
+.tabla-victimas-label {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-bottom: 0.35rem;
+}
+.tabla-victimas-cierre {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.tabla-victimas-cierre th,
+.tabla-victimas-cierre td {
+  padding: 0.5rem 0.65rem;
+  border: 1px solid #e2e8f0;
+  text-align: left;
+  vertical-align: middle;
+}
+.tabla-victimas-cierre thead th {
+  background: #f1f5f9;
+  font-weight: 600;
+}
+.input-num-cierre {
+  max-width: 8rem;
+}
+.tabla-victimas-cierre--lectura th {
+  width: 42%;
+  background: #f8fafc;
+  font-weight: 600;
+}
+.bloque-victimas-readonly {
+  margin-bottom: 1rem;
+}
+.victimas-resumen-texto {
+  margin: 0.5rem 0 0;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+  line-height: 1.4;
+}
 .form-actions-resultado {
   display: flex;
   gap: 0.75rem;
@@ -1384,6 +1534,16 @@ onUnmounted(() => {
   color: #0c4a6e;
   background: #e0f2fe;
   border: 1px solid #7dd3fc;
+  border-radius: var(--radius);
+}
+.aviso-lista-error {
+  margin: 0 0 0.65rem;
+  padding: 0.55rem 0.75rem;
+  font-size: 0.875rem;
+  line-height: 1.4;
+  color: #7f1d1d;
+  background: #fee2e2;
+  border: 1px solid #fecaca;
   border-radius: var(--radius);
 }
 .modal {

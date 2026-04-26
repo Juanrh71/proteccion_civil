@@ -8,9 +8,10 @@
       <span v-if="actualizando" class="polling">Actualizando…</span>
       <span v-else class="polling muted">Última actualización: {{ ultimaActualizacionTexto }}</span>
     </div>
+    <p v-if="errorCarga" class="mapa-error" role="alert">{{ errorCarga }}</p>
 
     <div class="mapa-box card">
-      <MapaCarabobo :incidentes="incidentes" mostrar-buscador />
+      <MapaCarabobo :incidentes="incidentes" mostrar-buscador encuadrar-estado-carabobo />
     </div>
     <div class="leyenda card">
       <h3>Leyenda por categoría</h3>
@@ -28,11 +29,13 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import MapaCarabobo from '../components/MapaCarabobo.vue'
 import { obtenerIncidentes } from '../api/incidentes'
-import { LEYENDA_GRUPOS_EXCEL } from '../utils/clasificacionExcelIncidentes.js'
+import { useCatalogoIncidentes } from '../composables/useCatalogoIncidentes.js'
 
+const { leyendaCategorias } = useCatalogoIncidentes()
 const incidentes = ref([])
 const actualizando = ref(false)
 const ultimaActualizacion = ref(null)
+const errorCarga = ref('')
 
 const INTERVALO_MS = 8000
 let intervalId = null
@@ -43,13 +46,16 @@ const ultimaActualizacionTexto = computed(() => {
   return u.toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
 })
 
-const categoriasLeyenda = computed(() => LEYENDA_GRUPOS_EXCEL)
+const categoriasLeyenda = leyendaCategorias
 
 async function refrescar() {
   actualizando.value = true
   try {
     incidentes.value = await obtenerIncidentes({ soloAbiertos: true })
+    errorCarga.value = ''
     ultimaActualizacion.value = new Date()
+  } catch (e) {
+    errorCarga.value = e?.message || 'No se pudo cargar el mapa.'
   } finally {
     actualizando.value = false
   }
@@ -69,6 +75,15 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+.mapa-error {
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  color: #7f1d1d;
+  background: #fee2e2;
+  border: 1px solid #fecaca;
+  border-radius: var(--radius, 6px);
+}
 .mapa-view {
   height: 100%;
   max-width: 1120px;

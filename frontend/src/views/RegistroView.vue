@@ -55,6 +55,20 @@
             </span>
             <span class="admin-menu-arrow" aria-hidden="true">&rarr;</span>
           </button>
+          <button type="button" class="admin-menu-card" @click="abrirPanel('catalogo')">
+            <span class="admin-menu-ico admin-menu-ico--catalog" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M4 4h5l2 3h9v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V4z" />
+                <line x1="8" y1="13" x2="16" y2="13" />
+                <line x1="8" y1="17" x2="12" y2="17" />
+              </svg>
+            </span>
+            <span class="admin-menu-text">
+              <span class="admin-menu-title">Cat&aacute;logo de incidentes</span>
+              <span class="admin-menu-desc">Categor&iacute;as, tipos, activar o desactivar en el registro y mapa.</span>
+            </span>
+            <span class="admin-menu-arrow" aria-hidden="true">&rarr;</span>
+          </button>
         </div>
 
         <div v-else class="admin-work">
@@ -143,7 +157,151 @@
             </p>
           </form>
 
-          <div v-else class="admin-surface admin-lista">
+          <div
+            v-else-if="panelAdmin === 'catalogo'"
+            class="admin-surface admin-catalogo"
+          >
+            <p v-if="errorCatalogo" class="msg error admin-catalogo-msg">{{ errorCatalogo }}</p>
+            <p v-else-if="cargandoCatalogo" class="msg msg-muted admin-catalogo-msg">Cargando cat&aacute;logo&hellip;</p>
+            <template v-else>
+              <div class="admin-catalogo-head">
+                <p class="admin-catalogo-title">Gesti&oacute;n r&aacute;pida del cat&aacute;logo</p>
+                <p class="admin-catalogo-sub">
+                  Paso 1: cree una categor&iacute;a (opcional). Paso 2: cree el tipo de incidente y seleccione su categor&iacute;a.
+                </p>
+                <div class="admin-catalogo-kpis">
+                  <span class="kpi-chip">Categor&iacute;as: {{ totalCategorias }}</span>
+                  <span class="kpi-chip">Tipos: {{ totalTipos }}</span>
+                  <span class="kpi-chip">Tipos visibles: {{ totalTiposActivos }}</span>
+                </div>
+              </div>
+              <div class="admin-catalogo-forms">
+                <div class="admin-catalogo-block admin-catalogo-block--step">
+                  <p class="admin-step-pill">Paso 1</p>
+                  <p class="admin-section-label">Nueva categor&iacute;a</p>
+                  <p class="admin-catalogo-help">Si solo va a crear un tipo en una categor&iacute;a existente, puede saltar este paso.</p>
+                  <div class="admin-catalogo-form-grid">
+                    <div class="form-group form-group-small">
+                      <label>Nombre</label>
+                      <input v-model="nuevaCategoria.nombre" type="text" class="input input-small" maxlength="100" placeholder="Ej.: Se&ntilde;alizaci&oacute;n" />
+                    </div>
+                    <div class="form-group form-group-small">
+                      <label>Identificador <span class="hint-slug">(opcional)</span></label>
+                      <input v-model="nuevaCategoria.slug" type="text" class="input input-small" maxlength="100" placeholder="se_nalizacion" />
+                    </div>
+                    <div class="form-group form-group-small">
+                      <label>Color</label>
+                      <input v-model="nuevaCategoria.color" type="color" class="input input-small input-color" />
+                    </div>
+                    <div class="form-group form-group-small admin-catalogo-form-actions">
+                      <button
+                        type="button"
+                        class="btn btn-primary admin-btn-primary"
+                        :disabled="creandoCategoria"
+                        @click="crearCategoriaAdmin"
+                      >
+                        {{ creandoCategoria ? 'Guardando...' : 'Crear categoría' }}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                <div class="admin-catalogo-block admin-catalogo-block--step">
+                  <p class="admin-step-pill">Paso 2</p>
+                  <p class="admin-section-label">Nuevo tipo de incidente</p>
+                  <p class="admin-catalogo-help">Seleccione una categor&iacute;a existente y asigne el nuevo tipo.</p>
+                  <div class="admin-catalogo-form-grid">
+                    <div class="form-group form-group-small">
+                      <label>Categor&iacute;a</label>
+                      <select v-model="nuevoTipo.id_categoria" class="input input-small">
+                        <option value="">Elija categoría</option>
+                        <option
+                          v-for="c in (catalogoAdmin.categorias || [])"
+                          :key="c.id"
+                          :value="c.id"
+                        >
+                          {{ c.nombre }} {{ c.activo ? '' : '(inactiva)' }}
+                        </option>
+                      </select>
+                    </div>
+                    <div class="form-group form-group-small">
+                      <label>Nombre</label>
+                      <input v-model="nuevoTipo.nombre" type="text" class="input input-small" maxlength="100" />
+                    </div>
+                    <div class="form-group form-group-small">
+                      <label>Identificador <span class="hint-slug">(opcional)</span></label>
+                      <input v-model="nuevoTipo.slug" type="text" class="input input-small" maxlength="100" />
+                    </div>
+                    <div class="form-group form-group-small admin-catalogo-form-actions">
+                      <button
+                        type="button"
+                        class="btn btn-primary admin-btn-primary"
+                        :disabled="creandoTipo"
+                        @click="crearTipoAdmin"
+                      >
+                        {{ creandoTipo ? 'Guardando...' : 'Crear tipo' }}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="admin-catalogo-arbol">
+                <p class="admin-catalogo-help admin-catalogo-help--list">
+                  Active o desactive categor&iacute;as y tipos. Lo inactivo no aparecer&aacute; en registro ni filtros.
+                </p>
+                <div
+                  v-for="c in (catalogoAdmin.categorias || [])"
+                  :key="c.id"
+                  class="admin-cat-fila"
+                >
+                  <div
+                    class="admin-cat-cab"
+                    :style="{ borderLeftColor: c.color || '#64748b' }"
+                  >
+                    <div class="admin-cat-tit">
+                      <span
+                        class="rol-tag"
+                        :class="c.activo ? 'rol-tag--oficial' : 'rol-tag--civil'"
+                      >{{ c.activo ? 'Activa' : 'Inactiva' }}</span>
+                      <strong class="admin-cat-nombre">{{ c.nombre }}</strong>
+                      <code class="admin-cat-slug">{{ c.slug }}</code>
+                    </div>
+                    <label class="admin-toggle">
+                      <input
+                        type="checkbox"
+                        :checked="c.activo"
+                        :disabled="patchCategoriaId === c.id"
+                        @change="toggleCategoria(c, $event.target.checked)"
+                      />
+                      <span>Visible en registro y listas</span>
+                    </label>
+                  </div>
+                  <ul v-if="(c.tipos || []).length" class="admin-tipos-lista">
+                    <li v-for="t in c.tipos" :key="t.id" class="admin-tipo-fila">
+                      <span
+                        class="rol-tag"
+                        :class="t.activo ? 'rol-tag--oficial' : 'rol-tag--civil'"
+                      >{{ t.activo ? 'Activo' : 'Inactivo' }}</span>
+                      <span class="admin-tipo-nombre">{{ t.nombre }}</span>
+                      <code class="admin-cat-slug">{{ t.slug }}</code>
+                      <label class="admin-toggle admin-toggle--right">
+                        <input
+                          type="checkbox"
+                          :checked="t.activo"
+                          :disabled="patchTipoId === t.id"
+                          @change="toggleTipo(t, $event.target.checked)"
+                        />
+                        <span>Visible</span>
+                      </label>
+                    </li>
+                  </ul>
+                  <p v-else class="admin-tipos-vacio">Sin tipos en esta categor&iacute;a.</p>
+                </div>
+                <p v-if="!(catalogoAdmin.categorias || []).length" class="msg msg-muted">No hay categor&iacute;as. Cree una arriba o ejecute el sembrado de base de datos.</p>
+              </div>
+            </template>
+          </div>
+
+          <div v-else-if="panelAdmin === 'activos'" class="admin-surface admin-lista">
             <div class="lista-toolbar">
               <span class="lista-toolbar-label">Filtrar por estado</span>
               <div class="chip-group" role="group" aria-label="Filtro por estado">
@@ -300,6 +458,14 @@ import { ref, reactive, computed, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuth } from '../composables/useAuth'
 import { getUsuario } from '../api/auth'
+import {
+  getCatalogoAdmin,
+  postCategoriaCatalogo,
+  patchCategoriaCatalogo,
+  postTipoCatalogo,
+  patchTipoCatalogo,
+} from '../api/catalogo'
+import { cargarCatalogoIncidentes } from '../composables/useCatalogoIncidentes'
 
 const PREFIJOS_CEDULA = [
   { value: 'V', label: 'V' },
@@ -314,7 +480,7 @@ const { registro, listarUsuarios, cambiarEstatusUsuario } = useAuth()
 const esModoAdmin = route.path === '/usuarios'
 const me = computed(() => getUsuario())
 
-const panelAdmin = ref(null) // null | 'registrar' | 'activos'
+const panelAdmin = ref(null) // null | 'registrar' | 'activos' | 'catalogo'
 const filtroEstatus = ref('activo')
 const usuarios = ref([])
 const cargandoUsuarios = ref(false)
@@ -326,7 +492,41 @@ const panelTitulo = computed(() => {
   if (panelAdmin.value === 'activos') {
     return filtroEstatus.value === 'inactivo' ? 'Usuarios bloqueados' : 'Usuarios activos'
   }
+  if (panelAdmin.value === 'catalogo') return 'Catálogo de incidentes'
   return ''
+})
+
+const catalogoAdmin = ref({ categorias: [] })
+const cargandoCatalogo = ref(false)
+const errorCatalogo = ref('')
+const creandoCategoria = ref(false)
+const creandoTipo = ref(false)
+const patchCategoriaId = ref(null)
+const patchTipoId = ref(null)
+const nuevaCategoria = ref({
+  nombre: '',
+  slug: '',
+  color: '#64748b',
+})
+const nuevoTipo = ref({
+  id_categoria: '',
+  nombre: '',
+  slug: '',
+})
+const totalCategorias = computed(() => (catalogoAdmin.value.categorias || []).length)
+const totalTipos = computed(() => {
+  let n = 0
+  for (const c of catalogoAdmin.value.categorias || []) n += (c.tipos || []).length
+  return n
+})
+const totalTiposActivos = computed(() => {
+  let n = 0
+  for (const c of catalogoAdmin.value.categorias || []) {
+    for (const t of c.tipos || []) {
+      if (t.activo) n += 1
+    }
+  }
+  return n
 })
 
 const form = ref({
@@ -360,12 +560,149 @@ function abrirPanel(panel) {
   panelAdmin.value = panel
   if (panel === 'activos') {
     cargarUsuarios()
+  } else if (panel === 'catalogo') {
+    cargarCatalogoAdminData()
+  }
+}
+
+async function cargarCatalogoAdminData() {
+  errorCatalogo.value = ''
+  cargandoCatalogo.value = true
+  try {
+    const data = await getCatalogoAdmin()
+    catalogoAdmin.value = {
+      categorias: Array.isArray(data?.categorias) ? data.categorias : [],
+    }
+  } catch (e) {
+    let msg = 'No se pudo cargar el catálogo.'
+    if (e.response && e.response.data && e.response.data.error) {
+      msg = e.response.data.error
+    }
+    errorCatalogo.value = msg
+    catalogoAdmin.value = { categorias: [] }
+  } finally {
+    cargandoCatalogo.value = false
+  }
+}
+
+async function sincronizarCatalogoPublico() {
+  try {
+    await cargarCatalogoIncidentes()
+  } catch {
+    /* ignore */
+  }
+}
+
+async function crearCategoriaAdmin() {
+  if (!nuevaCategoria.value.nombre || !String(nuevaCategoria.value.nombre).trim()) {
+    errorCatalogo.value = 'Indique el nombre de la categoría.'
+    return
+  }
+  creandoCategoria.value = true
+  errorCatalogo.value = ''
+  try {
+    const body = {
+      nombre: String(nuevaCategoria.value.nombre).trim(),
+      color: nuevaCategoria.value.color || '#64748b',
+    }
+    const slug = String(nuevaCategoria.value.slug || '').trim()
+    if (slug) body.slug = slug
+    const creada = await postCategoriaCatalogo(body)
+    if (creada && creada.id != null) {
+      nuevoTipo.value.id_categoria = String(creada.id)
+    }
+    nuevaCategoria.value = { nombre: '', slug: '', color: '#64748b' }
+    await cargarCatalogoAdminData()
+    await sincronizarCatalogoPublico()
+  } catch (e) {
+    let msg = 'No se pudo crear la categoría.'
+    if (e.response && e.response.data && e.response.data.error) {
+      msg = e.response.data.error
+    }
+    errorCatalogo.value = msg
+  } finally {
+    creandoCategoria.value = false
+  }
+}
+
+async function crearTipoAdmin() {
+  const idCat = parseInt(nuevoTipo.value.id_categoria, 10)
+  if (isNaN(idCat) || idCat < 1) {
+    errorCatalogo.value = 'Seleccione la categoría para el tipo.'
+    return
+  }
+  if (!nuevoTipo.value.nombre || !String(nuevoTipo.value.nombre).trim()) {
+    errorCatalogo.value = 'Indique el nombre del tipo.'
+    return
+  }
+  creandoTipo.value = true
+  errorCatalogo.value = ''
+  try {
+    const body = {
+      id_categoria: idCat,
+      nombre: String(nuevoTipo.value.nombre).trim(),
+    }
+    const slug = String(nuevoTipo.value.slug || '').trim()
+    if (slug) body.slug = slug
+    await postTipoCatalogo(body)
+    nuevoTipo.value = { id_categoria: '', nombre: '', slug: '' }
+    await cargarCatalogoAdminData()
+    await sincronizarCatalogoPublico()
+  } catch (e) {
+    let msg = 'No se pudo crear el tipo.'
+    if (e.response && e.response.data && e.response.data.error) {
+      msg = e.response.data.error
+    }
+    errorCatalogo.value = msg
+  } finally {
+    creandoTipo.value = false
+  }
+}
+
+async function toggleCategoria(c, val) {
+  if (!c || c.id == null) return
+  patchCategoriaId.value = c.id
+  errorCatalogo.value = ''
+  try {
+    await patchCategoriaCatalogo(c.id, { activo: val })
+    await cargarCatalogoAdminData()
+    await sincronizarCatalogoPublico()
+  } catch (e) {
+    let msg = 'No se pudo actualizar la categoría.'
+    if (e.response && e.response.data && e.response.data.error) {
+      msg = e.response.data.error
+    }
+    errorCatalogo.value = msg
+    await cargarCatalogoAdminData()
+  } finally {
+    patchCategoriaId.value = null
+  }
+}
+
+async function toggleTipo(t, val) {
+  if (!t || t.id == null) return
+  patchTipoId.value = t.id
+  errorCatalogo.value = ''
+  try {
+    await patchTipoCatalogo(t.id, { activo: val })
+    await cargarCatalogoAdminData()
+    await sincronizarCatalogoPublico()
+  } catch (e) {
+    let msg = 'No se pudo actualizar el tipo.'
+    if (e.response && e.response.data && e.response.data.error) {
+      msg = e.response.data.error
+    }
+    errorCatalogo.value = msg
+    await cargarCatalogoAdminData()
+  } finally {
+    patchTipoId.value = null
   }
 }
 
 function volverMenu() {
   panelAdmin.value = null
   errorLista.value = ''
+  errorCatalogo.value = ''
   procesandoId.value = null
 }
 
@@ -713,10 +1050,194 @@ async function enviar() {
 }
 .admin-menu {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   gap: 1rem;
   margin: 0 auto 1rem;
-  max-width: 880px;
+  max-width: 960px;
+}
+.admin-menu-ico--catalog {
+  color: #0a6b4a;
+  background: rgba(10, 107, 74, 0.1);
+}
+.admin-catalogo {
+  padding: 0;
+}
+.admin-catalogo-msg {
+  margin: 0.75rem 1.1rem 0;
+  text-align: left;
+  font-size: 0.9rem;
+}
+.admin-catalogo-head {
+  padding: 0.9rem 1.1rem 0.35rem;
+  border-bottom: 1px solid rgba(0, 51, 204, 0.1);
+  background: linear-gradient(180deg, rgba(0, 51, 204, 0.06) 0%, #fff 100%);
+}
+.admin-catalogo-title {
+  margin: 0 0 0.2rem;
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--color-text);
+}
+.admin-catalogo-sub {
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--color-text-muted);
+}
+.admin-catalogo-kpis {
+  margin-top: 0.55rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.45rem;
+}
+.kpi-chip {
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: #0a4a7a;
+  background: rgba(0, 51, 204, 0.08);
+  border: 1px solid rgba(0, 51, 204, 0.16);
+  border-radius: 999px;
+  padding: 0.18rem 0.55rem;
+}
+.admin-catalogo-forms {
+  padding: 0.9rem 1.1rem 0.5rem;
+  border-bottom: 1px solid rgba(0, 51, 204, 0.1);
+  background: linear-gradient(180deg, var(--color-surface-card) 0%, #fff 100%);
+}
+.admin-catalogo-block {
+  margin-bottom: 1rem;
+}
+.admin-catalogo-block--step {
+  border: 1px solid rgba(0, 51, 204, 0.12);
+  border-radius: 12px;
+  background: #fff;
+  padding: 0.7rem 0.75rem 0.55rem;
+}
+.admin-catalogo-block:last-child {
+  margin-bottom: 0.35rem;
+}
+.admin-step-pill {
+  display: inline-block;
+  margin: 0 0 0.35rem;
+  font-size: 0.68rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--color-royal-blue);
+}
+.admin-catalogo-help {
+  margin: 0 0 0.55rem;
+  font-size: 0.82rem;
+  color: var(--color-text-muted);
+}
+.admin-catalogo-help--list {
+  margin: 0.25rem 0 0.75rem;
+}
+.admin-catalogo-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.5rem 0.75rem;
+  align-items: end;
+}
+.admin-catalogo-form-actions {
+  display: flex;
+  align-items: flex-end;
+}
+.input-color {
+  height: 2.4rem;
+  padding: 0.2rem;
+  cursor: pointer;
+}
+.hint-slug {
+  font-weight: 400;
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+.admin-catalogo-arbol {
+  max-height: min(60vh, 28rem);
+  overflow: auto;
+  padding: 0.5rem 1.1rem 1rem;
+}
+.admin-cat-fila {
+  margin-bottom: 1rem;
+  border-radius: 10px;
+  border: 1px solid rgba(0, 51, 204, 0.1);
+  overflow: hidden;
+  background: #fafbff;
+}
+.admin-cat-cab {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  padding: 0.65rem 0.9rem;
+  border-left: 4px solid #64748b;
+}
+.admin-cat-tit {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.65rem;
+  min-width: 0;
+}
+.admin-cat-nombre {
+  font-size: 1rem;
+  color: var(--color-text);
+}
+.admin-cat-slug {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  background: rgba(0, 0, 0, 0.04);
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
+}
+.admin-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  user-select: none;
+}
+.admin-toggle input {
+  width: 1.05rem;
+  height: 1.05rem;
+  cursor: pointer;
+}
+.admin-tipos-lista {
+  list-style: none;
+  margin: 0;
+  padding: 0.35rem 0.5rem 0.5rem 1.1rem;
+  border-top: 1px solid rgba(0, 51, 204, 0.06);
+  background: #fff;
+}
+.admin-tipo-fila {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  align-items: center;
+  gap: 0.5rem 0.6rem;
+  padding: 0.45rem 0.35rem;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+  font-size: 0.9rem;
+}
+.admin-tipo-fila:last-child {
+  border-bottom: none;
+}
+.admin-tipo-nombre {
+  min-width: 0;
+  word-break: break-word;
+}
+.admin-toggle--right {
+  flex-shrink: 0;
+  margin-left: auto;
+}
+.admin-tipos-vacio {
+  margin: 0;
+  padding: 0.5rem 0.9rem 0.75rem;
+  font-size: 0.88rem;
+  color: var(--color-text-muted);
+  border-top: 1px solid rgba(0, 51, 204, 0.06);
 }
 .admin-menu-card {
   display: flex;

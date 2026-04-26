@@ -24,9 +24,9 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, watch } from 'vue'
+import { ref, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import L from 'leaflet'
-import { MAPA_CENTRO_CARABOBO, MAPA_ZOOM_DEFAULT } from '../config/incidentes'
+import { MAPA_CENTRO_CARABOBO, MAPA_ZOOM_DEFAULT, MAPA_BOUNDS_CARABOBO } from '../config/incidentes'
 import { buscarLugarPhoton } from '../utils/geocodingPhoton.js'
 import { colorGrupoExcel } from '../utils/clasificacionExcelIncidentes.js'
 
@@ -52,6 +52,11 @@ const props = defineProps({
     default: false,
   },
   mostrarBuscador: {
+    type: Boolean,
+    default: false,
+  },
+  /** Al abrir, encuadra todo el estado Carabobo (mapa en vivo) */
+  encuadrarEstadoCarabobo: {
     type: Boolean,
     default: false,
   },
@@ -190,7 +195,7 @@ function actualizarMarcadores() {
 
 onMounted(function () {
   if (!mapContainer.value) return
-  map = L.map(mapContainer.value).setView([props.centro.lat, props.centro.lng], props.zoom)
+  map = L.map(mapContainer.value)
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '© OpenStreetMap contributors',
   }).addTo(map)
@@ -202,8 +207,18 @@ onMounted(function () {
     })
   }
 
-  actualizarMarcadores()
-  loading.value = false
+  nextTick(function () {
+    if (!map) return
+    if (props.encuadrarEstadoCarabobo) {
+      const b = L.latLngBounds(MAPA_BOUNDS_CARABOBO)
+      map.fitBounds(b, { padding: [28, 28], maxZoom: 10, animate: false })
+    } else {
+      map.setView([props.centro.lat, props.centro.lng], props.zoom)
+    }
+    map.invalidateSize()
+    actualizarMarcadores()
+    loading.value = false
+  })
 })
 
 onUnmounted(function () {

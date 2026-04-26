@@ -12,10 +12,12 @@ API REST (Node.js + Express + MySQL) para la gestión de incidentes.
 En phpMyAdmin (XAMPP) o en la consola de MySQL, ejecuta el script:
 
 ```
-backend/db/schema.sql
+backend/db/proteccion_civil_carabobo.sql
 ```
 
-Crea la base de datos `proteccion_civil_carabobo` y la tabla `incidentes`.
+Crea la base de datos `proteccion_civil_carabobo` y las tablas principales del sistema.
+
+> Importante: este script hace `DROP DATABASE` y reemplaza por completo la base. Si ya tienes datos, respáldalos antes.
 
 ## 2. Configuración
 

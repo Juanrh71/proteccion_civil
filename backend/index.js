@@ -4,7 +4,8 @@ import cors from 'cors'
 import incidentesRouter from './routes/incidentes.js'
 import authRouter from './routes/auth.js'
 import geocodingRouter from './routes/geocoding.js'
-import { ensureIncidentesSchema } from './db/ensureSchema.js'
+import { ensureIncidentesSchema, ensureCatalogoEstructura } from './db/ensureSchema.js'
+import catalogoRouter from './routes/catalogo.js'
 
 const app = express()
 const PORT = process.env.PORT || 3000
@@ -16,11 +17,13 @@ app.use(express.json())
 app.use('/api/incidentes', incidentesRouter)
 app.use('/api/auth', authRouter)
 app.use('/api/geocoding', geocodingRouter)
+app.use('/api/catalogo', catalogoRouter)
 
 app.get('/api/health', (req, res) => res.json({ ok: true }))
 
 try {
   await ensureIncidentesSchema()
+  await ensureCatalogoEstructura()
 } catch {
   console.error('Revise la conexión a MySQL y que exista la base de datos.')
   process.exit(1)

@@ -1,4 +1,4 @@
--- Ejecutar en la base existente (MySQL). Nuevas instalaciones ya incluyen la columna en schema.sql.
+-- Ejecutar en la base existente (MySQL). Nuevas instalaciones ya incluyen la columna en proteccion_civil_carabobo.sql.
 USE proteccion_civil_carabobo;
 
 ALTER TABLE incidentes

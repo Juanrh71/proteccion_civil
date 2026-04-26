@@ -2,6 +2,7 @@
   <div class="dashboard">
     <header class="dashboard-head">
       <h1 class="dashboard-title">Dashboard</h1>
+      <p v-if="errorIncidentes" class="dash-error" role="alert">{{ errorIncidentes }}</p>
     </header>
 
     <section class="filters-bar dash-card">
@@ -60,18 +61,33 @@
     </section>
 
     <section class="grid-charts">
+      <div class="chart-toolbar dash-card">
+        <div class="chart-toolbar-actions">
+          <button
+            type="button"
+            class="btn btn-primary btn-refrescar"
+            :disabled="refrescando"
+            @click="refrescarDatos"
+          >
+            {{ refrescando ? 'Actualizando…' : 'Refrescar' }}
+          </button>
+          <p v-if="ultimaActualizacionTexto" class="ultima-actualizacion">
+            Última actualización: {{ ultimaActualizacionTexto }}
+          </p>
+        </div>
+      </div>
       <div class="dash-card chart-panel">
         <h2 class="chart-title">Por municipio</h2>
         <div class="chart-box">
           <Bar v-if="tieneBarrasMuni" :data="muniBarData" :options="barHorizontalOptions" />
-          <p v-else class="chart-empty">Sin datos para gráfico.</p>
+          <p v-else class="chart-empty">Sin datos para el periodo y filtros seleccionados.</p>
         </div>
       </div>
       <div class="dash-card chart-panel">
-        <h2 class="chart-title">Por tipo de incidente (últimas 24 horas)</h2>
+        <h2 class="chart-title">Por tipo de incidente (en proceso)</h2>
         <div class="chart-box">
           <Doughnut v-if="tieneTortaTipo" :data="tipoPieData" :options="tipoPieOptions" />
-          <p v-else class="chart-empty">Sin datos en las últimas 24 horas.</p>
+          <p v-else class="chart-empty">No hay incidentes en proceso en el periodo y filtros actuales.</p>
         </div>
       </div>
     </section>
@@ -133,10 +149,11 @@ import {
   MUNICIPIOS_CARABOBO,
 } from '../config/incidentes'
 import {
-  LEYENDA_GRUPOS_EXCEL,
   grupoExcelDeIncidente,
   colorGrupoExcel,
+  LEYENDA_GRUPOS_EXCEL,
 } from '../utils/clasificacionExcelIncidentes.js'
+import { useCatalogoIncidentes } from '../composables/useCatalogoIncidentes.js'
 
 ChartJS.register(
   CategoryScale,
@@ -171,9 +188,17 @@ const COLOR_FILL = 'rgba(128, 0, 0, 0.2)'
 const COLOR_LINE = '#800000'
 const COLOR_BAR_MAIN = 'rgba(0, 51, 204, 0.85)'
 
-const categoriasOpciones = LEYENDA_GRUPOS_EXCEL.map((c) => ({ id: c.id, nombre: c.nombre }))
+const { leyendaCategorias: leyendaCatDash } = useCatalogoIncidentes()
+const categoriasOpciones = computed(() => {
+  const L = leyendaCatDash.value
+  if (L && L.length) return L.map((c) => ({ id: c.id, nombre: c.nombre }))
+  return LEYENDA_GRUPOS_EXCEL.map((c) => ({ id: c.id, nombre: c.nombre }))
+})
 
 const incidentes = ref([])
+const errorIncidentes = ref('')
+const refrescando = ref(false)
+const ultimaActualizacion = ref(null)
 const vistaPeriodo = ref('mes')
 const periodoDia = ref(new Date().getDate())
 const periodoMes = ref(new Date().getMonth() + 1)
@@ -184,8 +209,6 @@ const filtroCatDash = ref('')
 const filtroDia = ref(new Date().getDate())
 const filtroMes = ref(new Date().getMonth() + 1)
 const filtroAno = ref(añoSugeridoParaIncidentes())
-const ahoraMs = ref(Date.now())
-let reloj24h = null
 let pollingIncidentes = null
 
 const anos = computed(() => {
@@ -299,16 +322,10 @@ const incidentesEnPeriodo = computed(() => {
   return list.filter((inc) => incEnAno(inc, periodoAnio.value))
 })
 
-const incidentesUltimas24h = computed(() => {
-  const ahora = ahoraMs.value
-  const desde = ahora - 24 * 60 * 60 * 1000
-  return incidentesFiltradosCapa.value.filter((inc) => {
-    const d = parseFechaInc(inc)
-    if (!d) return false
-    const t = d.getTime()
-    return t >= desde && t <= ahora
-  })
-})
+/** Solo "en proceso" (mismos periodo y filtros que el resto del tablero). */
+const incidentesEnProcesoEnPeriodo = computed(() =>
+  incidentesEnPeriodo.value.filter((inc) => inc && inc.estado === 'en_proceso')
+)
 
 const lineChartData = computed(() => {
   if (vistaPeriodo.value === 'dia') {
@@ -481,10 +498,11 @@ const muniBarData = computed(() => {
 })
 
 const tipoPieData = computed(() => {
-  const top = contarPorClave(incidentesUltimas24h.value, (inc) => inc.tipo_nombre || inc.tipo || 'Otro').slice(0, 12)
+  const base = incidentesEnProcesoEnPeriodo.value
+  const top = contarPorClave(base, (inc) => inc.tipo_nombre || inc.tipo || 'Otro').slice(0, 12)
   const colores = []
   for (const [label] of top) {
-    const incMatch = incidentesUltimas24h.value.find((inc) => (inc.tipo_nombre || inc.tipo || 'Otro') === label)
+    const incMatch = base.find((inc) => (inc.tipo_nombre || inc.tipo || 'Otro') === label)
     colores.push(colorGrupoExcel(incMatch))
   }
   return {
@@ -539,24 +557,52 @@ const incidentesFiltradosMapa = computed(() => {
   })
 })
 
-const categoriasLeyendaMapa = computed(() => LEYENDA_GRUPOS_EXCEL)
+const categoriasLeyendaMapa = leyendaCatDash
+
+const ultimaActualizacionTexto = computed(() => {
+  const u = ultimaActualizacion.value
+  if (!u) return ''
+  return u.toLocaleTimeString('es-VE', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  })
+})
+
+async function refrescarDatos() {
+  if (refrescando.value) return
+  refrescando.value = true
+  try {
+    incidentes.value = await obtenerIncidentes({ soloAbiertos: true })
+    ultimaActualizacion.value = new Date()
+    errorIncidentes.value = ''
+  } catch (e) {
+    errorIncidentes.value = e?.message || 'Error al actualizar incidentes.'
+  } finally {
+    refrescando.value = false
+  }
+}
 
 onMounted(async () => {
-  incidentes.value = await obtenerIncidentes()
-  reloj24h = setInterval(() => {
-    ahoraMs.value = Date.now()
-  }, 60000)
+  try {
+    incidentes.value = await obtenerIncidentes({ soloAbiertos: true })
+    errorIncidentes.value = ''
+    ultimaActualizacion.value = new Date()
+  } catch (e) {
+    errorIncidentes.value = e?.message || 'No se pudieron cargar los incidentes para el tablero.'
+  }
   pollingIncidentes = setInterval(async () => {
-    incidentes.value = await obtenerIncidentes()
-    ahoraMs.value = Date.now()
+    try {
+      incidentes.value = await obtenerIncidentes({ soloAbiertos: true })
+      errorIncidentes.value = ''
+      ultimaActualizacion.value = new Date()
+    } catch (e) {
+      errorIncidentes.value = e?.message || 'Error al actualizar incidentes.'
+    }
   }, 60000)
 })
 
 onUnmounted(() => {
-  if (reloj24h != null) {
-    clearInterval(reloj24h)
-    reloj24h = null
-  }
   if (pollingIncidentes != null) {
     clearInterval(pollingIncidentes)
     pollingIncidentes = null
@@ -575,6 +621,67 @@ onUnmounted(() => {
   margin-bottom: 1.25rem;
 }
 
+.dashboard-sub {
+  margin: 0.4rem 0 0;
+  max-width: 42rem;
+  font-size: 0.88rem;
+  line-height: 1.45;
+  color: var(--color-text-muted);
+}
+
+.chart-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem 1.25rem;
+  padding: 0.9rem 1.2rem 1rem;
+  margin: 0;
+  grid-column: 1 / -1;
+}
+
+.chart-toolbar-hint {
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  color: var(--color-text-muted);
+  max-width: 26rem;
+}
+
+.chart-toolbar-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.3rem;
+  flex-shrink: 0;
+}
+
+.btn-refrescar {
+  min-height: 2.75rem;
+  min-width: 8.5rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  padding-left: 1.25rem;
+  padding-right: 1.25rem;
+}
+
+.ultima-actualizacion {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.dash-error {
+  margin: 0.5rem 0 0;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  color: #7f1d1d;
+  background: #fee2e2;
+  border: 1px solid #fecaca;
+  border-radius: 6px;
+  max-width: 42rem;
+}
 .dashboard-title {
   font-size: 1.65rem;
   font-weight: 700;

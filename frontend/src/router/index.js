@@ -72,7 +72,7 @@ router.beforeEach((to, _from, next) => {
     next('/')
     return
   }
-  if (token && usuario?.rol === 'admin' && to.path !== '/usuarios' && to.path !== '/login') {
+  if (token && usuario?.rol === 'admin' && to.path === '/') {
     next('/usuarios')
     return
   }

@@ -1,10 +1,27 @@
 import { Router } from 'express'
+import jwt from 'jsonwebtoken'
 import pool from '../db/connection.js'
 
 const router = Router()
+const JWT_SECRET = process.env.JWT_SECRET || 'clave_secreta_cambiar_en_produccion'
+
+/** Id de usuario autenticado (Bearer) o null */
+function idUsuarioAutenticado(req) {
+  const auth = req.headers.authorization || ''
+  if (!auth.startsWith('Bearer ')) return null
+  try {
+    const payload = jwt.verify(auth.slice(7), JWT_SECRET)
+    const id = payload.id
+    if (id == null) return null
+    const n = Number(id)
+    return Number.isFinite(n) ? n : null
+  } catch {
+    return null
+  }
+}
 
 const SELECT_CAMPOS =
-  'id, tipo, tipo_nombre, categoria, descripcion, lat, lng, municipio, parroquia, via, fecha, cerrado, estado, resultado_cierre, observacion_cierre_abierto'
+  'id, tipo, tipo_nombre, categoria, descripcion, lat, lng, municipio, parroquia, via, fecha, cerrado, estado, resultado_cierre, observacion_cierre_abierto, heridos_cierre, fallecidos_cierre'
 
 function estadoDesdeFila(r) {
   const cerr = r.cerrado === 1 || r.cerrado === true
@@ -24,8 +41,17 @@ function coorANumeroONull(v) {
   return Number.isFinite(n) ? n : null
 }
 
+function enteroONull(v) {
+  if (v == null || v === '') return null
+  const n = parseInt(String(v), 10)
+  if (!Number.isFinite(n) || n < 0) return null
+  return n
+}
+
 function mapRow(r) {
   const { estado, cerrado } = estadoDesdeFila(r)
+  const hc = enteroONull(r.heridos_cierre)
+  const fc = enteroONull(r.fallecidos_cierre)
   return {
     id: r.id,
     tipo: r.tipo,
@@ -43,6 +69,8 @@ function mapRow(r) {
     resultado_cierre: r.resultado_cierre != null ? String(r.resultado_cierre) : '',
     observacion_cierre_abierto:
       r.observacion_cierre_abierto != null ? String(r.observacion_cierre_abierto) : '',
+    heridos_cierre: hc,
+    fallecidos_cierre: fc,
     segundos_desde_registro:
       r.segundos_desde_registro != null && r.segundos_desde_registro !== ''
         ? Number(r.segundos_desde_registro)
@@ -72,6 +100,17 @@ router.get('/', async (req, res) => {
 
 router.post('/', async (req, res) => {
   try {
+    const idReportante = idUsuarioAutenticado(req)
+    if (idReportante == null) {
+      return res
+        .status(401)
+        .json({ error: 'Inicie sesión para registrar un incidente (token requerido).' })
+    }
+    const [usr] = await pool.query('SELECT id FROM usuarios WHERE id = ?', [idReportante])
+    if (!usr || usr.length === 0) {
+      return res.status(401).json({ error: 'Usuario no válido. Vuelva a iniciar sesión.' })
+    }
+
     const { tipo, tipo_nombre, categoria, descripcion, lat, lng, municipio, parroquia, via, fecha } = req.body
     if (tipo == null || String(tipo).trim() === '') {
       return res.status(400).json({ error: 'Falta el tipo de incidente' })
@@ -79,8 +118,8 @@ router.post('/', async (req, res) => {
     const latVal = coorANumeroONull(lat)
     const lngVal = coorANumeroONull(lng)
     const [result] = await pool.query(
-      `INSERT INTO incidentes (tipo, tipo_nombre, categoria, descripcion, lat, lng, municipio, parroquia, via, fecha, cerrado, estado)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 'abierto')`,
+      `INSERT INTO incidentes (tipo, tipo_nombre, categoria, descripcion, lat, lng, municipio, parroquia, via, fecha, cerrado, estado, id_de_reportante, tipo_de_reportante)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 'abierto', ?, 'ciudadano')`,
       [
         tipo,
         tipo_nombre || tipo,
@@ -92,6 +131,7 @@ router.post('/', async (req, res) => {
         parroquia != null && String(parroquia).trim() !== '' ? String(parroquia).trim() : null,
         via != null && String(via).trim() !== '' ? String(via).trim() : null,
         fecha ? new Date(fecha) : new Date(),
+        idReportante,
       ]
     )
     const [rows] = await pool.query(
@@ -176,10 +216,32 @@ router.patch('/:id/cerrar', async (req, res) => {
         error: 'Solo puede cerrar incidentes abiertos o en proceso.',
       })
     }
-    const [result] = await pool.query(
-      `UPDATE incidentes SET cerrado = 1, estado = 'cerrado', resultado_cierre = ? WHERE id = ?`,
-      [resultado, id]
-    )
+    const desdeEnProceso = estado === 'en_proceso'
+    let heridosCierre = null
+    let fallecidosCierre = null
+    if (desdeEnProceso) {
+      const h = parseInt(req.body.heridos_cierre, 10)
+      const f = parseInt(req.body.fallecidos_cierre, 10)
+      if (!Number.isFinite(h) || h < 0 || h > 999999) {
+        return res.status(400).json({ error: 'Indique un número válido de heridos (0 o más).' })
+      }
+      if (!Number.isFinite(f) || f < 0 || f > 999999) {
+        return res.status(400).json({ error: 'Indique un número válido de fallecidos (0 o más).' })
+      }
+      heridosCierre = h
+      fallecidosCierre = f
+    }
+
+    let sql = `UPDATE incidentes SET cerrado = 1, estado = 'cerrado', resultado_cierre = ?`
+    const params = [resultado]
+    if (desdeEnProceso) {
+      sql += ', heridos_cierre = ?, fallecidos_cierre = ?'
+      params.push(heridosCierre, fallecidosCierre)
+    }
+    sql += ' WHERE id = ?'
+    params.push(id)
+
+    const [result] = await pool.query(sql, params)
     if (result.affectedRows === 0) {
       return res.status(404).json({ error: 'Incidente no encontrado' })
     }
