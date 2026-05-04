@@ -506,7 +506,7 @@ const patchTipoId = ref(null)
 const nuevaCategoria = ref({
   nombre: '',
   slug: '',
-  color: '#64748b',
+  color: '#475569',
 })
 const nuevoTipo = ref({
   id_categoria: '',
@@ -611,7 +611,7 @@ async function crearCategoriaAdmin() {
     if (creada && creada.id != null) {
       nuevoTipo.value.id_categoria = String(creada.id)
     }
-    nuevaCategoria.value = { nombre: '', slug: '', color: '#64748b' }
+    nuevaCategoria.value = { nombre: '', slug: '', color: '#475569' }
     await cargarCatalogoAdminData()
     await sincronizarCatalogoPublico()
   } catch (e) {

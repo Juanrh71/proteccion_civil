@@ -1,15 +1,16 @@
 export const GRUPOS_EXCEL = {
-  hecho_vial: { nombre: 'Hecho Vial', color: '#ea580c' },
-  incendio: { nombre: 'Incendio', color: '#b91c1c' },
-  busqueda_rescate: { nombre: 'Búsqueda y Rescate', color: '#0284c7' },
-  guardia_seguridad_prevencion: { nombre: 'Guardia de Seguridad y Prevención', color: '#059669' },
-  condicion_arborea: { nombre: 'Condición Arbórea', color: '#0d9488' },
-  solicitud_traslado: { nombre: 'Solicitud de Traslado', color: '#dc2626' },
-  hidrometeorologico: { nombre: 'Hidrometeorológico', color: '#0ea5e9' },
-  colapso_estructura: { nombre: 'Colapso de Estructura', color: '#7c3aed' },
-  inspeccion_reubicacion_animal: { nombre: 'Inspección y Reubicación Animal', color: '#ca8a04' },
-  eliminacion_peligro: { nombre: 'Eliminación de Peligro', color: '#6d28d9' },
-  otro: { nombre: 'Otro', color: '#64748b' },
+  hecho_vial: { nombre: 'Hecho Vial', color: '#6d28d9' },
+  incendio: { nombre: 'Incendio', color: '#a21caf' },
+  busqueda_rescate: { nombre: 'Búsqueda y Rescate', color: '#4338ca' },
+  guardia_seguridad_prevencion: { nombre: 'Guardia de Seguridad y Prevención', color: '#7c2d12' },
+  condicion_arborea: { nombre: 'Condición Arbórea', color: '#14532d' },
+  solicitud_traslado: { nombre: 'Solicitud de Traslado', color: '#9f1239' },
+  clima: { nombre: 'Clima', color: '#3b82f6' },
+  hidrometeorologico: { nombre: 'Hidrometeorológico', color: '#0f766e' },
+  colapso_estructura: { nombre: 'Colapso de Estructura', color: '#374151' },
+  inspeccion_reubicacion_animal: { nombre: 'Inspección y Reubicación Animal', color: '#854d0e' },
+  eliminacion_peligro: { nombre: 'Eliminación de Peligro', color: '#4c1d95' },
+  otro: { nombre: 'Otro', color: '#334155' },
 }
 
 // Clasificación tal como está en el Excel (mapeada por id de tipo).
@@ -73,6 +74,14 @@ const GRUPO_POR_TIPO = {
   lesionado_por_arma_de_fuego: 'solicitud_traslado',
   lesionado_por_descarga_electrica: 'solicitud_traslado',
 
+  despejado: 'clima',
+  nublado: 'clima',
+  precipitaciones_leves: 'clima',
+  precipitaciones_moderadas: 'clima',
+  precipitaciones_fuertes: 'clima',
+  precipitaciones_severas: 'clima',
+  precipitaciones_torrenciales: 'clima',
+
   anegacion: 'hidrometeorologico',
   inhundacion: 'hidrometeorologico',
   desbordamiento_cano_rio_canal: 'hidrometeorologico',
@@ -90,6 +99,16 @@ const GRUPO_POR_TIPO = {
   derrame_de_hidrocarburo: 'eliminacion_peligro',
 }
 
+const COLOR_TIPO_FIJO = {
+  despejado: '#ffffff',
+  nublado: '#9ca3af',
+  precipitaciones_leves: '#3b82f6',
+  precipitaciones_moderadas: '#84cc16',
+  precipitaciones_fuertes: '#facc15',
+  precipitaciones_severas: '#d97706',
+  precipitaciones_torrenciales: '#dc2626',
+}
+
 /** Id de categoría Excel (columna / agrupación del libro) para un id de tipo */
 export function grupoExcelDeTipoId(tipoId) {
   const tipo = String(tipoId || '').trim()
@@ -100,6 +119,12 @@ export function grupoExcelDeTipoId(tipoId) {
 let coloresCategoriasDinamicos = null
 export function setColoresCategoriasDinamicos(map) {
   coloresCategoriasDinamicos =
+    map && typeof map === 'object' ? { ...map } : null
+}
+
+let coloresTiposDinamicos = null
+export function setColoresTiposDinamicos(map) {
+  coloresTiposDinamicos =
     map && typeof map === 'object' ? { ...map } : null
 }
 
@@ -122,6 +147,14 @@ export function grupoExcelDeIncidente(inc) {
 }
 
 export function colorGrupoExcel(inc) {
+  const tipo = inc?.tipo != null ? String(inc.tipo).trim() : ''
+  if (tipo) {
+    const dinTipo = coloresTiposDinamicos && coloresTiposDinamicos[tipo]
+    if (dinTipo) return dinTipo
+    if (Object.prototype.hasOwnProperty.call(COLOR_TIPO_FIJO, tipo)) {
+      return COLOR_TIPO_FIJO[tipo]
+    }
+  }
   const g = grupoExcelDeIncidente(inc)
   const din = coloresCategoriasDinamicos && coloresCategoriasDinamicos[g]
   if (din) return din

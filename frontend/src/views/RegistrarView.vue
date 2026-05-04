@@ -15,14 +15,14 @@
             </select>
           </div>
           <div class="form-group">
-            <label>Tipo de incidente</label>
+            <label>{{ etiquetaTipo }}</label>
             <div class="combo" :class="{ 'combo-abierto': abrirTipo, 'combo-disabled': !form.categoria_grupo }">
               <input
                 v-model="tipoQuery"
                 type="text"
                 class="combo-input"
                 :disabled="!form.categoria_grupo"
-                :placeholder="form.categoria_grupo ? 'Escriba para buscar y elija…' : 'Seleccione una categoría arriba'"
+                :placeholder="placeholderTipo"
                 autocomplete="off"
                 aria-autocomplete="list"
                 :aria-expanded="abrirTipo"
@@ -41,21 +41,9 @@
                 >
                   {{ nombreTipoVisible(t) }}
                 </li>
-                <li v-if="tiposFiltrados.length === 0" class="combo-vacio">
-                  {{ form.categoria_grupo ? 'Sin coincidencias' : 'Seleccione categoría' }}
-                </li>
+                <li v-if="tiposFiltrados.length === 0" class="combo-vacio">{{ textoSinTipos }}</li>
               </ul>
             </div>
-          </div>
-          <div class="form-group" v-if="mostrarCampoSubcategoria">
-            <label>Subcategoría <span class="hint-opcional">(opcional)</span></label>
-            <input
-              v-model.trim="form.subcategoria_detalle"
-              type="text"
-              class="input"
-              maxlength="120"
-              placeholder="Ej.: poste principal, sector norte..."
-            />
           </div>
         </div>
 
@@ -206,14 +194,15 @@ function nombreTipoVisible(t) {
 const { categorias, tiposPlano } = useCatalogoIncidentes()
 
 const tiposActivosLista = computed(() => {
-  if (categorias.value.length > 0) {
-    return tiposPlano.value
-  }
-  return TIPOS_INCIDENTE.map((t) => ({
+  const fallback = TIPOS_INCIDENTE.map((t) => ({
     id: t.id,
     nombre: t.nombre,
     categoria: grupoExcelDeTipoId(t.id),
   }))
+  if (categorias.value.length > 0) {
+    return tiposPlano.value.length > 0 ? tiposPlano.value : fallback
+  }
+  return fallback
 })
 
 const categoriasSelect = computed(() => {
@@ -254,7 +243,17 @@ const tiposFiltrados = computed(() => {
   })
 })
 
-const mostrarCampoSubcategoria = computed(() => !!form.value.tipo)
+const esCategoriaClima = computed(() => form.value.categoria_grupo === 'clima')
+const etiquetaTipo = computed(() => (esCategoriaClima.value ? 'Tipo de clima' : 'Tipo de incidente'))
+const placeholderTipo = computed(() => {
+  if (!form.value.categoria_grupo) return 'Seleccione una categoría arriba'
+  if (esCategoriaClima.value) return 'Ej.: despejado, nublado, precipitaciones moderadas...'
+  return 'Escriba para buscar y elija…'
+})
+const textoSinTipos = computed(() => {
+  if (!form.value.categoria_grupo) return 'Seleccione categoría'
+  return esCategoriaClima.value ? 'Sin tipos de clima registrados' : 'Sin coincidencias'
+})
 
 const municipiosFiltrados = computed(() => {
   const q = normalizarBusqueda(municipioQuery.value.trim())
@@ -295,7 +294,6 @@ function onTipoBlur() {
 function elegirTipo(t) {
   form.value.tipo = t.id
   tipoQuery.value = nombreTipoVisible(t)
-  form.value.subcategoria_detalle = ''
   abrirTipo.value = false
 }
 
@@ -378,7 +376,6 @@ let secuenciaReverseRegistrar = 0
 const form = ref({
   categoria_grupo: '',
   tipo: '',
-  subcategoria_detalle: '',
   municipio: '',
   parroquia: '',
   via: '',
@@ -410,7 +407,6 @@ watch(tipoQuery, (q) => {
   if (!sel) return
   if (normalizarBusqueda((q || '').trim()) !== normalizarBusqueda(nombreTipoVisible(sel))) {
     form.value.tipo = ''
-    form.value.subcategoria_detalle = ''
   }
 })
 
@@ -418,7 +414,6 @@ watch(
   () => form.value.categoria_grupo,
   () => {
     form.value.tipo = ''
-    form.value.subcategoria_detalle = ''
     tipoQuery.value = ''
     abrirTipo.value = false
   }
@@ -502,7 +497,6 @@ function limpiar() {
   form.value = {
     categoria_grupo: '',
     tipo: '',
-    subcategoria_detalle: '',
     municipio: '',
     parroquia: '',
     via: '',
@@ -542,7 +536,6 @@ async function enviar() {
       grupo_excel_id: form.value.categoria_grupo,
       tipo_nombre_base: nombreTipoVisible(tipoSel) || (tipoSel && tipoSel.nombre) || String(form.value.tipo),
       categoria_nombre: catSel ? catSel.nombre : '',
-      subcategoria_detalle: form.value.subcategoria_detalle,
       municipio: form.value.municipio,
       parroquia: form.value.parroquia,
       via: form.value.via,

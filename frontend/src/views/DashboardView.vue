@@ -58,6 +58,16 @@
           <Line :data="lineChartData" :options="lineChartOptions" />
         </div>
       </div>
+      <div class="dash-card dashboard-kpis">
+        <div class="kpi-item">
+          <span class="kpi-label">Heridos (periodo)</span>
+          <strong class="kpi-value">{{ totalHeridosPeriodo }}</strong>
+        </div>
+        <div class="kpi-item">
+          <span class="kpi-label">Fallecidos (periodo)</span>
+          <strong class="kpi-value">{{ totalFallecidosPeriodo }}</strong>
+        </div>
+      </div>
     </section>
 
     <section class="grid-charts">
@@ -111,7 +121,7 @@
         </div>
       </div>
       <div class="map-box">
-        <MapaCarabobo :incidentes="incidentesFiltradosMapa" mostrar-buscador />
+        <MapaCarabobo :incidentes="incidentesFiltradosMapa" mostrar-buscador encuadrar-estado-carabobo />
       </div>
       <div class="leyenda-mapa">
         <span v-for="cat in categoriasLeyendaMapa" :key="cat.id" class="leyenda-item">
@@ -188,7 +198,7 @@ const COLOR_FILL = 'rgba(128, 0, 0, 0.2)'
 const COLOR_LINE = '#800000'
 const COLOR_BAR_MAIN = 'rgba(0, 51, 204, 0.85)'
 
-const { leyendaCategorias: leyendaCatDash } = useCatalogoIncidentes()
+const { leyendaCategorias: leyendaCatDash, leyendaMapa: leyendaMapaDash } = useCatalogoIncidentes()
 const categoriasOpciones = computed(() => {
   const L = leyendaCatDash.value
   if (L && L.length) return L.map((c) => ({ id: c.id, nombre: c.nombre }))
@@ -326,6 +336,30 @@ const incidentesEnPeriodo = computed(() => {
 const incidentesEnProcesoEnPeriodo = computed(() =>
   incidentesEnPeriodo.value.filter((inc) => inc && inc.estado === 'en_proceso')
 )
+
+function valorConteoAfectados(inc, campoBase, campoCierre) {
+  const cierre = Number(inc?.[campoCierre])
+  if (Number.isFinite(cierre) && cierre >= 0) return cierre
+  const base = Number(inc?.[campoBase])
+  if (Number.isFinite(base) && base >= 0) return base
+  return 0
+}
+
+const totalHeridosPeriodo = computed(() => {
+  let n = 0
+  for (const inc of incidentesEnPeriodo.value) {
+    n += valorConteoAfectados(inc, 'heridos', 'heridos_cierre')
+  }
+  return n
+})
+
+const totalFallecidosPeriodo = computed(() => {
+  let n = 0
+  for (const inc of incidentesEnPeriodo.value) {
+    n += valorConteoAfectados(inc, 'fallecidos', 'fallecidos_cierre')
+  }
+  return n
+})
 
 const lineChartData = computed(() => {
   if (vistaPeriodo.value === 'dia') {
@@ -557,7 +591,7 @@ const incidentesFiltradosMapa = computed(() => {
   })
 })
 
-const categoriasLeyendaMapa = leyendaCatDash
+const categoriasLeyendaMapa = leyendaMapaDash
 
 const ultimaActualizacionTexto = computed(() => {
   const u = ultimaActualizacion.value
@@ -573,7 +607,7 @@ async function refrescarDatos() {
   if (refrescando.value) return
   refrescando.value = true
   try {
-    incidentes.value = await obtenerIncidentes({ soloAbiertos: true })
+    incidentes.value = await obtenerIncidentes()
     ultimaActualizacion.value = new Date()
     errorIncidentes.value = ''
   } catch (e) {
@@ -585,7 +619,7 @@ async function refrescarDatos() {
 
 onMounted(async () => {
   try {
-    incidentes.value = await obtenerIncidentes({ soloAbiertos: true })
+    incidentes.value = await obtenerIncidentes()
     errorIncidentes.value = ''
     ultimaActualizacion.value = new Date()
   } catch (e) {
@@ -593,7 +627,7 @@ onMounted(async () => {
   }
   pollingIncidentes = setInterval(async () => {
     try {
-      incidentes.value = await obtenerIncidentes({ soloAbiertos: true })
+      incidentes.value = await obtenerIncidentes()
       errorIncidentes.value = ''
       ultimaActualizacion.value = new Date()
     } catch (e) {
@@ -741,6 +775,34 @@ onUnmounted(() => {
   padding: 1.15rem 1.25rem 1.35rem;
 }
 
+.dashboard-kpis {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.6rem;
+}
+
+.kpi-item {
+  border: 1px solid #dbe6f2;
+  border-radius: 10px;
+  background: #f8fbff;
+  padding: 0.7rem 0.8rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.22rem;
+}
+
+.kpi-label {
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+  font-weight: 600;
+}
+
+.kpi-value {
+  font-size: 1.35rem;
+  color: var(--color-secondary);
+  line-height: 1.1;
+}
+
 .chart-title {
   font-size: 1rem;
   font-weight: 600;
@@ -843,6 +905,7 @@ onUnmounted(() => {
   width: 12px;
   height: 12px;
   border-radius: 50%;
+  border: 1px solid rgba(15, 23, 42, 0.28);
   display: inline-block;
   flex-shrink: 0;
 }

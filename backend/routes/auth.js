@@ -30,6 +30,35 @@ function authTokenDesdeHeader(req) {
   return auth.slice(7)
 }
 
+/** Bearer JWT: expone `req.userId` para rutas protegidas (app móvil). */
+export function verifyToken(req, res, next) {
+  const token = authTokenDesdeHeader(req)
+  if (!token) {
+    return res.status(401).json({ error: 'Token no proporcionado.' })
+  }
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET)
+    const id = decoded?.id
+    if (id == null || !Number.isFinite(Number(id))) {
+      return res.status(403).json({ error: 'Token inválido o expirado.' })
+    }
+    req.userId = Number(id)
+    next()
+  } catch {
+    return res.status(403).json({ error: 'Token inválido o expirado.' })
+  }
+}
+
+/** La app puede enviar "civil"; en BD el rol es `ciudadano`. No se permite alta como admin por esta vía. */
+function rolDesdeApp(rolRaw) {
+  const r = String(rolRaw ?? '')
+    .trim()
+    .toLowerCase()
+  if (r === 'civil' || r === 'ciudadano' || r === '') return 'ciudadano'
+  if (r === 'oficial') return 'oficial'
+  return 'ciudadano'
+}
+
 async function requireAdmin(req, res, next) {
   try {
     const token = authTokenDesdeHeader(req)
@@ -161,6 +190,87 @@ router.patch('/usuarios/:id/estatus', requireAdmin, async (req, res) => {
   }
 })
 
+/** Registro desde app móvil (sin sesión admin). Usuario queda `pendiente` hasta aprobación. */
+router.post('/register-app', async (req, res) => {
+  try {
+    const { nombre, apellido, correo, cedula, telefono, password, rol } = req.body
+
+    if (!nombre || !String(nombre).trim()) {
+      return res.status(400).json({ error: 'El nombre es requerido.' })
+    }
+    if (!apellido || !String(apellido).trim()) {
+      return res.status(400).json({ error: 'El apellido es requerido.' })
+    }
+    if (!correo || !password || !cedula || !telefono) {
+      return res.status(400).json({
+        error: 'Faltan campos obligatorios (correo, cédula, teléfono o contraseña).',
+      })
+    }
+
+    const correoNorm = correo.toString().trim().toLowerCase()
+    if (!emailRegex.test(correoNorm)) {
+      return res.status(400).json({ error: 'El correo no tiene un formato válido.' })
+    }
+
+    const cedulaNorm = cedula.toString().replace(/\s/g, '').toUpperCase()
+    if (!cedulaRegex.test(cedulaNorm)) {
+      return res.status(400).json({
+        error: 'La cédula debe ser tipo V, J o E seguido de 6 a 9 dígitos.',
+      })
+    }
+
+    const telNorm = telefono.toString().replace(/\s/g, '')
+    if (!telefonoRegex.test(telNorm)) {
+      return res.status(400).json({
+        error:
+          'El teléfono debe ser móvil Venezuela: 04xx más 7 dígitos (11 dígitos en total).',
+      })
+    }
+
+    if (String(password).length < MIN_PASSWORD_LENGTH) {
+      return res.status(400).json({
+        error: `La contraseña debe tener al menos ${MIN_PASSWORD_LENGTH} caracteres.`,
+      })
+    }
+
+    const [existe] = await pool.query(
+      'SELECT id FROM usuarios WHERE correo = ? OR cedula = ?',
+      [correoNorm, cedulaNorm]
+    )
+    if (existe.length > 0) {
+      return res.status(400).json({ error: 'El correo o la cédula ya están registrados.' })
+    }
+
+    const [telDup] = await pool.query('SELECT id FROM usuarios WHERE telefono = ?', [telNorm])
+    if (telDup.length > 0) {
+      return res.status(400).json({ error: 'Ya existe un usuario con ese número de teléfono.' })
+    }
+
+    const rolDb = rolDesdeApp(rol)
+    const password_hash = await bcrypt.hash(password, SALT_ROUNDS)
+
+    await pool.query(
+      `INSERT INTO usuarios
+       (nombre, apellido, correo, cedula, telefono, rol, estatus, password_hash)
+       VALUES (?, ?, ?, ?, ?, ?, 'pendiente', ?)`,
+      [
+        nombre.toString().trim(),
+        apellido.toString().trim(),
+        correoNorm,
+        cedulaNorm,
+        telNorm,
+        rolDb,
+        password_hash,
+      ]
+    )
+
+    res.status(201).json({ ok: true, message: 'Usuario de la App registrado con éxito.' })
+  } catch (err) {
+    console.error('Error en register-app:', err)
+    res.status(500).json({ error: 'Error interno del servidor.' })
+  }
+})
+
 router.post('/login', async (req, res) => {
   try {
     const { correo, password } = req.body
@@ -210,6 +320,78 @@ router.post('/login', async (req, res) => {
   } catch (err) {
     console.error(err)
     res.status(500).json({ error: 'Error al iniciar sesión.' })
+  }
+})
+
+router.put('/update-profile', verifyToken, async (req, res) => {
+  const { nombre, apellido, telefono } = req.body
+  const id = req.userId
+
+  if (!nombre || !String(nombre).trim() || !apellido || !String(apellido).trim()) {
+    return res.status(400).json({ error: 'Nombre y apellido son requeridos.' })
+  }
+  const telNorm =
+    telefono != null && String(telefono).trim()
+      ? String(telefono).replace(/\s/g, '')
+      : null
+  if (!telNorm || !telefonoRegex.test(telNorm)) {
+    return res.status(400).json({
+      error:
+        'El teléfono debe ser móvil Venezuela: 04xx más 7 dígitos (11 dígitos en total).',
+    })
+  }
+
+  try {
+    const [otros] = await pool.query(
+      'SELECT id FROM usuarios WHERE telefono = ? AND id <> ?',
+      [telNorm, id]
+    )
+    if (otros.length > 0) {
+      return res.status(400).json({ error: 'Ese número de teléfono ya está en uso.' })
+    }
+
+    await pool.query(
+      'UPDATE usuarios SET nombre = ?, apellido = ?, telefono = ? WHERE id = ?',
+      [nombre.toString().trim(), apellido.toString().trim(), telNorm, id]
+    )
+    res.json({ ok: true, message: 'Perfil actualizado correctamente' })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Error al actualizar el perfil' })
+  }
+})
+
+router.put('/change-password', verifyToken, async (req, res) => {
+  const { currentPassword, newPassword } = req.body
+  const userId = req.userId
+
+  if (
+    currentPassword == null ||
+    String(currentPassword).length === 0 ||
+    newPassword == null ||
+    String(newPassword).length < MIN_PASSWORD_LENGTH
+  ) {
+    return res.status(400).json({
+      error: `Contraseña actual y nueva contraseña (mínimo ${MIN_PASSWORD_LENGTH} caracteres).`,
+    })
+  }
+
+  try {
+    const [rows] = await pool.query('SELECT password_hash FROM usuarios WHERE id = ?', [
+      userId,
+    ])
+    if (rows.length === 0) return res.status(404).json({ error: 'Usuario no encontrado' })
+
+    const match = await bcrypt.compare(currentPassword, rows[0].password_hash)
+    if (!match) return res.status(401).json({ error: 'La contraseña actual es incorrecta' })
+
+    const newHash = await bcrypt.hash(newPassword, SALT_ROUNDS)
+    await pool.query('UPDATE usuarios SET password_hash = ? WHERE id = ?', [newHash, userId])
+
+    res.json({ ok: true, message: 'Contraseña actualizada con éxito' })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Error interno del servidor' })
   }
 })
 

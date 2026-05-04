@@ -75,12 +75,25 @@ let map = null
 let layerGroup = null
 let capaMarcadorBusqueda = null
 
+function esColorClaro(hex) {
+  const h = String(hex || '').trim().replace('#', '')
+  if (!/^[0-9a-fA-F]{6}$/.test(h)) return false
+  const r = parseInt(h.slice(0, 2), 16)
+  const g = parseInt(h.slice(2, 4), 16)
+  const b = parseInt(h.slice(4, 6), 16)
+  const luminancia = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255
+  return luminancia >= 0.8
+}
+
 function crearIcono(incidente) {
   const color = colorGrupoExcel(incidente)
+  const borde = esColorClaro(color) ? '#334155' : 'white'
   const html =
     '<span style="background:' +
     color +
-    ';width:24px;height:24px;border-radius:50%;display:block;border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,0.3)"></span>'
+    ';width:24px;height:24px;border-radius:50%;display:block;border:2px solid ' +
+    borde +
+    ';box-shadow:0 1px 3px rgba(0,0,0,0.3)"></span>'
   return L.divIcon({
     className: 'marker-incidente',
     html: html,

@@ -128,7 +128,11 @@
         </div>
         <div class="form-group">
           <label>Buscar</label>
-          <input v-model="filtroTexto" type="text" class="input" placeholder="Tipo, municipio, parroquia o calle…" />
+          <input v-model="filtroTexto" type="text" class="input" placeholder="Tipo, municipio o parroquia…" />
+        </div>
+        <div class="form-group">
+          <label>Calle / Avenida</label>
+          <input v-model="filtroVia" type="text" class="input" placeholder="Escriba calle o avenida…" />
         </div>
       </div>
     </div>
@@ -237,7 +241,6 @@
         </table>
       </div>
       <div class="leyenda-acciones" aria-label="Leyenda: qué hace cada icono de la columna Acc.">
-        <span class="leyenda-titulo">Leyenda de acciones</span>
         <span class="leyenda-item">
           <span class="leyenda-icon-muestra btn-icon btn-icon--editar" aria-hidden="true">
             <svg class="btn-icon-svg" viewBox="0 0 24 24" focusable="false">
@@ -500,6 +503,7 @@ const filtroTipo = ref('')
 const filtroMunicipios = ref([])
 const filtroParroquias = ref([])
 const filtroTexto = ref('')
+const filtroVia = ref('')
 const municipioQuery = ref('')
 const parroquiaQuery = ref('')
 const abrirMunicipios = ref(false)
@@ -575,6 +579,12 @@ const incidentesFiltrados = computed(() => {
     if (filtroTipo.value && inc.tipo !== filtroTipo.value) continue
     if (filtroMunicipios.value.length > 0 && !filtroMunicipios.value.includes(inc.municipio || '')) continue
     if (filtroParroquias.value.length > 0 && !filtroParroquias.value.includes(inc.parroquia || '')) continue
+    const viaBuscar = filtroVia.value.trim()
+    if (viaBuscar) {
+      const viaNorm = normalizarBusqueda(viaBuscar)
+      const viaInc = inc.via != null ? normalizarBusqueda(String(inc.via)) : ''
+      if (!viaInc.includes(viaNorm)) continue
+    }
     const textoBuscar = filtroTexto.value.trim()
     if (textoBuscar) {
       const buscar = normalizarBusqueda(textoBuscar)
@@ -1185,6 +1195,7 @@ onUnmounted(() => {
 }
 .th-acc {
   width: 3.1rem;
+  text-align: center !important;
 }
 .td-fecha {
   font-variant-numeric: tabular-nums;
@@ -1253,6 +1264,7 @@ onUnmounted(() => {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
+  justify-content: flex-start;
   gap: 0.5rem 1rem;
   padding: 0.5rem 0.1rem 0.35rem;
   font-size: 0.75rem;
@@ -1260,18 +1272,10 @@ onUnmounted(() => {
   border-bottom: 1px solid #e8edf3;
   flex-shrink: 0;
 }
-.leyenda-titulo {
-  flex-basis: 100%;
-  font-size: 0.7rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: #64748b;
-  margin: 0;
-}
 .leyenda-item {
   display: inline-flex;
   align-items: center;
+  justify-content: flex-start;
   gap: 0.4rem;
 }
 .leyenda-icon-muestra {
@@ -1288,14 +1292,19 @@ onUnmounted(() => {
   flex-wrap: nowrap;
   gap: 0.25rem;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: center;
 }
 .acciones-cell {
   width: 1%;
   white-space: nowrap;
-  padding-left: 0.2rem;
+  text-align: center;
+  padding-left: 0;
+  padding-right: 0;
 }
 .btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   min-width: 1.9rem;
   min-height: 1.9rem;
   width: 1.9rem;
@@ -1313,6 +1322,7 @@ onUnmounted(() => {
   display: block;
   width: 1rem;
   height: 1rem;
+  margin: 0 auto;
 }
 .btn-icon--editar {
   /* Azul cielo: buen contraste con icono, sin mancha oscura en la tabla */

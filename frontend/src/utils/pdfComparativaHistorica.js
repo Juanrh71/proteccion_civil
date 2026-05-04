@@ -11,11 +11,22 @@ function texto(v) {
   return String(v)
 }
 
+function hexToRgb(hex) {
+  const v = String(hex || '').trim().replace('#', '')
+  if (!/^[0-9a-fA-F]{6}$/.test(v)) return null
+  return {
+    r: parseInt(v.slice(0, 2), 16),
+    g: parseInt(v.slice(2, 4), 16),
+    b: parseInt(v.slice(4, 6), 16),
+  }
+}
+
 export function descargarPdfComparativaHistorica({
   titulo = 'Comparativa histórica',
   subtitulo = '',
   etiquetas = [],
   valores = [],
+  categoriasResumen = [],
   nombreArchivo = 'comparativa_historica.pdf',
 }) {
   if (!etiquetas.length || !valores.length || etiquetas.length !== valores.length) {
@@ -71,6 +82,59 @@ export function descargarPdfComparativaHistorica({
   doc.setFontSize(9)
   doc.setTextColor(80)
   doc.text('Comparativa de reportes', x0, y0 - 2)
+
+  if (Array.isArray(categoriasResumen) && categoriasResumen.length > 0) {
+    const legendX = 12
+    let legendY = y0 + chartH + 12
+    const legendEndY = pageH - 10
+    const colW = (pageW - 24) / 2
+    const rowH = 5.2
+    const colCount = 2
+    const maxRowsPerCol = Math.max(1, Math.floor((legendEndY - (legendY + 6)) / rowH))
+    const maxItemsPage = maxRowsPerCol * colCount
+    let index = 0
+    let firstPageLegend = true
+
+    while (index < categoriasResumen.length) {
+      if (!firstPageLegend) {
+        doc.addPage()
+        legendY = 18
+      }
+
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(10)
+      doc.setTextColor(20)
+      doc.text(firstPageLegend ? 'Incidentes por categoría' : 'Incidentes por categoría (continuación)', legendX, legendY)
+      legendY += 6
+
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(9)
+      const slice = categoriasResumen.slice(index, index + maxItemsPage)
+
+      slice.forEach((item, localIdx) => {
+        const col = Math.floor(localIdx / maxRowsPerCol)
+        const row = localIdx % maxRowsPerCol
+        const x = legendX + col * colW
+        const y = legendY + row * rowH
+        const rgb = hexToRgb(item?.color)
+        if (rgb) {
+          doc.setFillColor(rgb.r, rgb.g, rgb.b)
+        } else {
+          doc.setFillColor(71, 85, 105)
+        }
+        doc.circle(x + 1.8, y - 1.2, 1.4, 'F')
+        doc.setTextColor(35)
+        doc.text(`${texto(item?.nombre) || 'Sin categoría'} (${Number(item?.total) || 0})`, x + 5, y)
+      })
+
+      index += slice.length
+      firstPageLegend = false
+    }
+  }
+
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(9)
+  doc.setTextColor(80)
   doc.text('Protección Civil Carabobo', 12, pageH - 6)
 
   doc.save(nombreArchivoSeguro(nombreArchivo))

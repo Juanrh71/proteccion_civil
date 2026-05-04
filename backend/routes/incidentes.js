@@ -1,5 +1,8 @@
 import { Router } from 'express'
 import jwt from 'jsonwebtoken'
+import multer from 'multer'
+import path from 'path'
+import fs from 'fs'
 import pool from '../db/connection.js'
 
 const router = Router()
@@ -34,6 +37,68 @@ function estadoDesdeFila(r) {
 }
 
 const SELECT_LISTADO = `${SELECT_CAMPOS}, TIMESTAMPDIFF(SECOND, fecha, NOW()) AS segundos_desde_registro`
+const MINUTOS_AUTO_CIERRE_LLUVIA = 40
+const LLUVIA_TIPOS_AUTO_CIERRE = [
+  'precipitaciones_leves',
+  'precipitaciones_moderadas',
+  'precipitaciones_fuertes',
+  'precipitaciones_severas',
+  'precipitaciones_torrenciales',
+  // compatibilidad con slugs previos
+  'lluvia_leve',
+  'lluvia_moderada',
+  'lluvia_fuerte',
+]
+
+async function autoCerrarIncidentesLluviaPorTiempo() {
+  try {
+    const placeholders = LLUVIA_TIPOS_AUTO_CIERRE.map(() => '?').join(',')
+    const sql = `
+      UPDATE incidentes
+      SET
+        cerrado = 1,
+        estado = 'cerrado',
+        fecha_cierre = NOW(),
+        resultado_cierre = CASE
+          WHEN resultado_cierre IS NULL OR TRIM(resultado_cierre) = ''
+            THEN 'Cierre automático por tiempo: incidente de lluvia mayor a 40 minutos.'
+          ELSE resultado_cierre
+        END
+      WHERE
+        tipo IN (${placeholders})
+        AND (cerrado = 0 OR cerrado IS NULL)
+        AND (estado IS NULL OR estado IN ('abierto', 'en_proceso'))
+        AND TIMESTAMPDIFF(MINUTE, fecha, NOW()) >= ?`
+    await pool.query(sql, [...LLUVIA_TIPOS_AUTO_CIERRE, MINUTOS_AUTO_CIERRE_LLUVIA])
+  } catch (e) {
+    console.warn('[incidentes] auto-cierre lluvia:', e.message)
+  }
+}
+
+const uploadsEvidencias = path.join(process.cwd(), 'uploads', 'evidencias')
+try {
+  fs.mkdirSync(uploadsEvidencias, { recursive: true })
+} catch {
+  /* ignorar si ya existe o sin permiso en arranque */
+}
+
+const upload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, uploadsEvidencias),
+    filename: (_req, file, cb) => {
+      const ext = path.extname(file.originalname || '').slice(0, 24)
+      cb(null, `${Date.now()}_${Math.random().toString(36).slice(2, 12)}${ext}`)
+    },
+  }),
+})
+
+/** Alineado a ENUM('No','Heridos','Muertos') en incidentes.afectados */
+function afectadosEnumDesdeConteos(nHeridos, nFallecidos) {
+  if (nHeridos > 0 && nFallecidos > 0) return 'Muertos'
+  if (nHeridos > 0) return 'Heridos'
+  if (nFallecidos > 0) return 'Muertos'
+  return 'No'
+}
 
 function coorANumeroONull(v) {
   if (v == null || v === '') return null
@@ -66,6 +131,8 @@ function mapRow(r) {
     fecha: r.fecha ? new Date(r.fecha).toISOString() : null,
     cerrado,
     estado,
+    heridos: hc ?? 0,
+    fallecidos: fc ?? 0,
     resultado_cierre: r.resultado_cierre != null ? String(r.resultado_cierre) : '',
     observacion_cierre_abierto:
       r.observacion_cierre_abierto != null ? String(r.observacion_cierre_abierto) : '',
@@ -78,8 +145,197 @@ function mapRow(r) {
   }
 }
 
+/** Catálogo para la app (primer dropdown) */
+router.get('/categorias', async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      'SELECT id, nombre FROM categorias_incidentes ORDER BY nombre ASC'
+    )
+    res.json(rows)
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Error al obtener categorías' })
+  }
+})
+
+/** Tipos para la app (segundo dropdown) */
+router.get('/tipos', async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      'SELECT id, id_categoria, nombre FROM tipos_de_incidentes ORDER BY nombre ASC'
+    )
+    res.json(rows)
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Error al obtener tipos' })
+  }
+})
+
+/**
+ * Reporte desde app móvil (multipart: campo archivo `evidencia`).
+ * Inserta usando catálogo tipos/categorías; `incidentes.tipo` guarda el slug del tipo.
+ */
+router.post('/reportar', upload.single('evidencia'), async (req, res) => {
+  try {
+    const {
+      id_de_reportante,
+      id_tipo,
+      descripcion,
+      lat,
+      lng,
+      municipio,
+      parroquia,
+      via,
+      tipo_de_reportante,
+      afectados,
+      heridos_cierre,
+      fallecidos_cierre,
+    } = req.body
+
+    const idRep = parseInt(id_de_reportante, 10)
+    const idTipo = parseInt(id_tipo, 10)
+    if (!Number.isFinite(idRep) || idRep < 1) {
+      return res.status(400).json({ error: 'id_de_reportante inválido' })
+    }
+    if (!Number.isFinite(idTipo) || idTipo < 1) {
+      return res.status(400).json({ error: 'id_tipo inválido' })
+    }
+
+    const nHeridos = parseInt(heridos_cierre, 10) || 0
+    const nFallecidos = parseInt(fallecidos_cierre, 10) || 0
+    const afAllowed = ['No', 'Heridos', 'Muertos']
+    let estadoAfectados = afectadosEnumDesdeConteos(nHeridos, nFallecidos)
+    if (afectados != null && afAllowed.includes(String(afectados).trim())) {
+      estadoAfectados = String(afectados).trim()
+    }
+
+    const evidencia_visual = req.file ? req.file.filename : null
+
+    const procDb = 'movil'
+
+    const tipoRep =
+      tipo_de_reportante === 'oficial' || tipo_de_reportante === 'ciudadano'
+        ? tipo_de_reportante
+        : 'ciudadano'
+
+    const sql = `
+      INSERT INTO incidentes (
+        id_de_reportante,
+        tipo,
+        tipo_nombre,
+        categoria,
+        descripcion,
+        lat,
+        lng,
+        municipio,
+        parroquia,
+        via,
+        procedencia,
+        evidencia_visual,
+        estado,
+        cerrado,
+        fecha,
+        afectados,
+        heridos_cierre,
+        fallecidos_cierre,
+        tipo_de_reportante
+      )
+      SELECT
+        ?,
+        COALESCE(NULLIF(TRIM(t.slug), ''), CONCAT('id_', t.id)),
+        t.nombre,
+        c.nombre,
+        ?,
+        ?, ?, ?, ?, ?,
+        ?,
+        ?,
+        'abierto',
+        0,
+        NOW(),
+        ?,
+        ?, ?,
+        ?
+      FROM tipos_de_incidentes t
+      INNER JOIN categorias_incidentes c ON t.id_categoria = c.id
+      WHERE t.id = ?`
+
+    const latVal = coorANumeroONull(lat)
+    const lngVal = coorANumeroONull(lng)
+
+    const [result] = await pool.query(sql, [
+      idRep,
+      descripcion || '',
+      latVal,
+      lngVal,
+      municipio || null,
+      parroquia || null,
+      via || null,
+      procDb,
+      evidencia_visual,
+      estadoAfectados,
+      nHeridos,
+      nFallecidos,
+      tipoRep,
+      idTipo,
+    ])
+
+    res.status(201).json({ ok: true, id: result.insertId })
+  } catch (err) {
+    console.error('Error en POST /reportar:', err)
+    res.status(500).json({ error: 'Error al guardar el reporte' })
+  }
+})
+
+router.get('/mis-reportes/:id_usuario', async (req, res) => {
+  const idUsuario = parseInt(req.params.id_usuario, 10)
+  if (!Number.isFinite(idUsuario) || idUsuario < 1) {
+    return res.status(400).json({ error: 'id_usuario inválido' })
+  }
+  try {
+    const query = `
+      SELECT
+        id,
+        tipo_nombre,
+        categoria,
+        descripcion,
+        estado,
+        afectados,
+        heridos_cierre,
+        fallecidos_cierre,
+        created_at
+      FROM incidentes
+      WHERE id_de_reportante = ?
+      ORDER BY created_at DESC`
+
+    const [rows] = await pool.query(query, [idUsuario])
+    res.json(rows)
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Error al obtener el historial' })
+  }
+})
+
+router.get('/mapa-global', async (req, res) => {
+  try {
+    await autoCerrarIncidentesLluviaPorTiempo()
+    const query = `
+      SELECT
+        id, tipo_nombre, categoria, lat, lng, estado, created_at
+      FROM incidentes
+      WHERE estado != 'cerrado'
+      ORDER BY created_at DESC`
+
+    const [rows] = await pool.query(query)
+    res.json(rows)
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Error al cargar el mapa' })
+  }
+})
+
 router.get('/', async (req, res) => {
   try {
+    await autoCerrarIncidentesLluviaPorTiempo()
     const soloAbiertos =
       req.query.solo_abiertos === '1' ||
       req.query.solo_abiertos === 'true'
@@ -123,7 +379,7 @@ router.post('/', async (req, res) => {
       [
         tipo,
         tipo_nombre || tipo,
-        categoria || 'otro',
+        categoria != null && String(categoria).trim() !== '' ? String(categoria).trim() : null,
         descripcion || '',
         latVal,
         lngVal,
@@ -288,7 +544,7 @@ router.put('/:id', async (req, res) => {
       [
         tipo,
         tipo_nombre || tipo,
-        categoria || 'otro',
+        categoria != null && String(categoria).trim() !== '' ? String(categoria).trim() : null,
         descripcion || '',
         latVal,
         lngVal,

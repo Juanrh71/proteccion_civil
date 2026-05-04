@@ -67,6 +67,15 @@ export const TIPOS_INCIDENTE = [
   { id: 'lesionado_por_arma_de_fuego', nombre: 'Lesionado por arma de fuego', categoria: 'medico', clasificacion: CLASIFICACION_EMERGENTE },
   { id: 'lesionado_por_descarga_electrica', nombre: 'Lesionado por descarga electrica', categoria: 'medico', clasificacion: CLASIFICACION_EMERGENTE },
 
+  // Clima
+  { id: 'despejado', nombre: 'Despejado', categoria: 'clima', clasificacion: CLASIFICACION_EMERGENTE },
+  { id: 'nublado', nombre: 'Nublado', categoria: 'clima', clasificacion: CLASIFICACION_EMERGENTE },
+  { id: 'precipitaciones_leves', nombre: 'Precipitaciones leves', categoria: 'clima', clasificacion: CLASIFICACION_EMERGENTE },
+  { id: 'precipitaciones_moderadas', nombre: 'Precipitaciones moderadas', categoria: 'clima', clasificacion: CLASIFICACION_EMERGENTE },
+  { id: 'precipitaciones_fuertes', nombre: 'Precipitaciones fuertes', categoria: 'clima', clasificacion: CLASIFICACION_EMERGENTE },
+  { id: 'precipitaciones_severas', nombre: 'Precipitaciones severas', categoria: 'clima', clasificacion: CLASIFICACION_EMERGENTE },
+  { id: 'precipitaciones_torrenciales', nombre: 'Precipitaciones torrenciales', categoria: 'clima', clasificacion: CLASIFICACION_EMERGENTE },
+
   // Hidrometeorológico
   { id: 'anegacion', nombre: 'Anegacion', categoria: 'socio_natural', clasificacion: CLASIFICACION_EMERGENTE },
   { id: 'inhundacion', nombre: 'Inhundacion', categoria: 'socio_natural', clasificacion: CLASIFICACION_EMERGENTE },

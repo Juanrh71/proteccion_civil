@@ -13,6 +13,9 @@ frontend/.vite/
 .env.*
 !.env.example
 
+# Subidas locales (evidencias app móvil)
+backend/uploads/
+
 # Logs y sistema
 *.log
 npm-debug.log*

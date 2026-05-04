@@ -498,6 +498,39 @@ export async function ensureCatalogoEstructura() {
         console.warn('[db] categorias_incidentes.orden:', e.message)
       }
     }
+    const categoriasBaseColor = [
+      { slug: 'hecho_vial', color: '#6d28d9' },
+      { slug: 'incendio', color: '#a21caf' },
+      { slug: 'busqueda_rescate', color: '#4338ca' },
+      { slug: 'guardia_seguridad_prevencion', color: '#7c2d12' },
+      { slug: 'condicion_arborea', color: '#14532d' },
+      { slug: 'solicitud_traslado', color: '#9f1239' },
+      { slug: 'clima', color: '#3b82f6' },
+      { slug: 'hidrometeorologico', color: '#0f766e' },
+      { slug: 'colapso_estructura', color: '#374151' },
+      { slug: 'inspeccion_reubicacion_animal', color: '#854d0e' },
+      { slug: 'eliminacion_peligro', color: '#4c1d95' },
+      { slug: 'otro', color: '#334155' },
+    ]
+    // Asegura categoría base para eventos climáticos en bases ya pobladas.
+    try {
+      await pool.query(
+        `INSERT INTO categorias_incidentes (slug, nombre, color, activo, orden, emergencia)
+         SELECT 'clima', 'Clima', '#3b82f6', 1, 7, 'Si'
+         WHERE NOT EXISTS (
+           SELECT 1 FROM categorias_incidentes WHERE slug = 'clima'
+         )`
+      )
+    } catch (e) {
+      console.warn('[db] categorias_incidentes.clima:', e.message)
+    }
+    for (const c of categoriasBaseColor) {
+      try {
+        await pool.query('UPDATE categorias_incidentes SET color = ? WHERE slug = ?', [c.color, c.slug])
+      } catch (e) {
+        console.warn(`[db] categorias_incidentes.${c.slug}.color:`, e.message)
+      }
+    }
     if (!(await hasTable(dbName, 'tipos_de_incidentes'))) {
       return
     }
@@ -506,6 +539,13 @@ export async function ensureCatalogoEstructura() {
         await pool.query('ALTER TABLE tipos_de_incidentes ADD COLUMN slug VARCHAR(120) NULL')
       } catch (e) {
         console.warn('[db] tipos_de_incidentes.slug:', e.message)
+      }
+    }
+    if (!(await hasColumn(dbName, 'tipos_de_incidentes', 'color'))) {
+      try {
+        await pool.query('ALTER TABLE tipos_de_incidentes ADD COLUMN color VARCHAR(20) NULL')
+      } catch (e) {
+        console.warn('[db] tipos_de_incidentes.color:', e.message)
       }
     }
     if (!(await hasColumn(dbName, 'tipos_de_incidentes', 'activo'))) {
@@ -520,6 +560,53 @@ export async function ensureCatalogoEstructura() {
         await pool.query('ALTER TABLE tipos_de_incidentes ADD COLUMN orden INT NOT NULL DEFAULT 0')
       } catch (e) {
         console.warn('[db] tipos_de_incidentes.orden:', e.message)
+      }
+    }
+    const tiposClimaBase = [
+      { slug: 'despejado', nombre: 'Despejado', orden: 1, color: '#ffffff' },
+      { slug: 'nublado', nombre: 'Nublado', orden: 2, color: '#9ca3af' },
+      { slug: 'precipitaciones_leves', nombre: 'Precipitaciones leves', orden: 3, color: '#3b82f6' },
+      { slug: 'precipitaciones_moderadas', nombre: 'Precipitaciones moderadas', orden: 4, color: '#84cc16' },
+      { slug: 'precipitaciones_fuertes', nombre: 'Precipitaciones fuertes', orden: 5, color: '#facc15' },
+      { slug: 'precipitaciones_severas', nombre: 'Precipitaciones severas', orden: 6, color: '#d97706' },
+      { slug: 'precipitaciones_torrenciales', nombre: 'Precipitaciones torrenciales', orden: 7, color: '#dc2626' },
+    ]
+    const legacyClima = [
+      'lluvia_fuerte',
+      'lluvia_moderada',
+      'lluvia_leve',
+      'tormenta_electrica',
+      'vientos_fuertes',
+      'granizada',
+      'ola_de_calor',
+    ]
+    for (const t of tiposClimaBase) {
+      try {
+        await pool.query(
+          `INSERT INTO tipos_de_incidentes (slug, nombre, id_categoria, color, activo, orden)
+           SELECT ?, ?, c.id, ?, 1, ?
+           FROM categorias_incidentes c
+           WHERE c.slug = 'clima'
+           AND NOT EXISTS (
+             SELECT 1 FROM tipos_de_incidentes x WHERE x.slug = ?
+           )`,
+          [t.slug, t.nombre, t.color, t.orden, t.slug]
+        )
+        await pool.query(
+          `UPDATE tipos_de_incidentes
+           SET color = ?, nombre = ?, orden = ?
+           WHERE slug = ?`,
+          [t.color, t.nombre, t.orden, t.slug]
+        )
+      } catch (e) {
+        console.warn(`[db] tipos_de_incidentes.${t.slug}:`, e.message)
+      }
+    }
+    for (const legacySlug of legacyClima) {
+      try {
+        await pool.query('UPDATE tipos_de_incidentes SET activo = 0 WHERE slug = ?', [legacySlug])
+      } catch (e) {
+        console.warn(`[db] tipos_de_incidentes.${legacySlug}.activo:`, e.message)
       }
     }
     await seedCatalogoVacio()

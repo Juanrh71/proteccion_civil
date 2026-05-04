@@ -35,9 +35,9 @@ export async function seedCatalogoVacio() {
         continue
       }
       await conn.query(
-        `INSERT INTO tipos_de_incidentes (slug, nombre, id_categoria, activo, orden)
-         VALUES (?, ?, ?, 1, 0)`,
-        [tip.slug, trunc100(tip.nombre), idC]
+        `INSERT INTO tipos_de_incidentes (slug, nombre, id_categoria, color, activo, orden)
+         VALUES (?, ?, ?, ?, 1, 0)`,
+        [tip.slug, trunc100(tip.nombre), idC, tip.color || null]
       )
     }
     await conn.commit()

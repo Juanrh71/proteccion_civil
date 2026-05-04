@@ -155,6 +155,20 @@
         <p v-else-if="comparativaChartData && modoComparativa === 'anios'" class="comparativa-viz-sub">
           Total en años seleccionados: {{ totalComparativaSeleccion }}
         </p>
+        <div v-if="comparativaChartData && comparativaCategoriasResumen.length" class="comparativa-leyenda-cat">
+          <p class="comparativa-leyenda-titulo">Incidentes por categoría</p>
+          <div class="comparativa-leyenda-items">
+            <span
+              v-for="item in comparativaCategoriasResumen"
+              :key="item.id"
+              class="comparativa-leyenda-item"
+              :title="`${item.nombre}: ${item.total} incidente(s)`"
+            >
+              <i :style="{ background: item.color }" />
+              {{ item.nombre }} ({{ item.total }})
+            </span>
+          </div>
+        </div>
       </section>
     </template>
 
@@ -229,6 +243,11 @@ import {
   RANGO_ANO_FIN,
   añoSugeridoParaIncidentes,
 } from '../config/incidentes'
+import {
+  colorGrupoExcel,
+  grupoExcelDeIncidente,
+  nombreGrupoExcel,
+} from '../utils/clasificacionExcelIncidentes.js'
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, BarController, Tooltip, Legend)
 
@@ -490,6 +509,49 @@ const totalComparativaSeleccion = computed(() => {
   return d.datasets[0].data.reduce((a, b) => a + (Number(b) || 0), 0)
 })
 
+function nombreTipoBase(inc) {
+  const t = String(inc?.tipo_nombre || inc?.tipo || '').trim()
+  if (!t) return 'Clima'
+  const idx = t.indexOf('|')
+  return (idx >= 0 ? t.slice(0, idx) : t).trim() || 'Clima'
+}
+
+const incidentesComparativaSeleccion = computed(() => {
+  if (modoComparativa.value === 'meses') {
+    const meses = [...mesesSeleccionados.value]
+    if (meses.length < 2) return []
+    const anio = anioComparativa.value
+    return incidentes.value.filter((inc) => {
+      const d = parseFechaInc(inc)
+      return d && d.getFullYear() === anio && meses.includes(d.getMonth() + 1)
+    })
+  }
+  const anios = [...aniosSeleccionados.value]
+  if (anios.length < 2) return []
+  return incidentes.value.filter((inc) => {
+    const d = parseFechaInc(inc)
+    return d && anios.includes(d.getFullYear())
+  })
+})
+
+const comparativaCategoriasResumen = computed(() => {
+  const map = new Map()
+  for (const inc of incidentesComparativaSeleccion.value) {
+    const grupo = grupoExcelDeIncidente(inc)
+    const esClima = grupo === 'clima'
+    const id = esClima ? `clima:${String(inc?.tipo || '').trim() || 'sin_tipo'}` : grupo
+    const nombre = esClima ? nombreTipoBase(inc) : nombreGrupoExcel(inc)
+    const color = colorGrupoExcel(inc)
+    const prev = map.get(id)
+    if (prev) {
+      prev.total += 1
+    } else {
+      map.set(id, { id, nombre, color, total: 1 })
+    }
+  }
+  return Array.from(map.values()).sort((a, b) => b.total - a.total)
+})
+
 const comparativaChartOptions = {
   responsive: true,
   maintainAspectRatio: false,
@@ -530,6 +592,7 @@ function descargarPdfHistorico() {
         subtitulo: `Año ${anioComparativa.value}`,
         etiquetas,
         valores,
+        categoriasResumen: comparativaCategoriasResumen.value,
         nombreArchivo: `comparativa_meses_${anioComparativa.value}_${stamp}.pdf`,
       })
       return
@@ -548,6 +611,7 @@ function descargarPdfHistorico() {
       subtitulo: 'Incidentes registrados',
       etiquetas,
       valores,
+      categoriasResumen: comparativaCategoriasResumen.value,
       nombreArchivo: `comparativa_anios_${stamp}.pdf`,
     })
   } catch (err) {
@@ -749,6 +813,46 @@ onMounted(async () => {
 .comparativa-viz-sub strong {
   color: var(--color-secondary);
   font-weight: 600;
+}
+
+.comparativa-leyenda-cat {
+  margin-top: 0.9rem;
+  border-top: 1px solid #e2e8f0;
+  padding-top: 0.65rem;
+}
+
+.comparativa-leyenda-titulo {
+  margin: 0 0 0.45rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--color-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.035em;
+}
+
+.comparativa-leyenda-items {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.35rem 0.8rem;
+}
+
+.comparativa-leyenda-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
+  font-size: 0.82rem;
+  color: var(--color-text-muted);
+  line-height: 1.3;
+}
+
+.comparativa-leyenda-item i {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 1px solid rgba(15, 23, 42, 0.28);
+  display: inline-block;
+  flex-shrink: 0;
 }
 
 .comparativa-chart-box {

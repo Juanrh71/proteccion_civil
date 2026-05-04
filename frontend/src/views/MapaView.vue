@@ -14,7 +14,7 @@
       <MapaCarabobo :incidentes="incidentes" mostrar-buscador encuadrar-estado-carabobo />
     </div>
     <div class="leyenda card">
-      <h3>Leyenda por categoría</h3>
+      <h3>Leyenda del mapa</h3>
       <div class="leyenda-items">
         <span v-for="cat in categoriasLeyenda" :key="cat.id" class="leyenda-item">
           <i :style="{ background: cat.color }" />
@@ -31,7 +31,7 @@ import MapaCarabobo from '../components/MapaCarabobo.vue'
 import { obtenerIncidentes } from '../api/incidentes'
 import { useCatalogoIncidentes } from '../composables/useCatalogoIncidentes.js'
 
-const { leyendaCategorias } = useCatalogoIncidentes()
+const { leyendaMapa } = useCatalogoIncidentes()
 const incidentes = ref([])
 const actualizando = ref(false)
 const ultimaActualizacion = ref(null)
@@ -46,7 +46,7 @@ const ultimaActualizacionTexto = computed(() => {
   return u.toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
 })
 
-const categoriasLeyenda = leyendaCategorias
+const categoriasLeyenda = leyendaMapa
 
 async function refrescar() {
   actualizando.value = true
@@ -155,6 +155,7 @@ onUnmounted(() => {
   width: 14px;
   height: 14px;
   border-radius: 50%;
+  border: 1px solid rgba(15, 23, 42, 0.28);
   display: inline-block;
   flex-shrink: 0;
 }

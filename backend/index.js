@@ -6,6 +6,7 @@ import authRouter from './routes/auth.js'
 import geocodingRouter from './routes/geocoding.js'
 import { ensureIncidentesSchema, ensureCatalogoEstructura } from './db/ensureSchema.js'
 import catalogoRouter from './routes/catalogo.js'
+import edanRoutes from './routes/edan.js'
 
 const app = express()
 const PORT = process.env.PORT || 3000
@@ -18,6 +19,7 @@ app.use('/api/incidentes', incidentesRouter)
 app.use('/api/auth', authRouter)
 app.use('/api/geocoding', geocodingRouter)
 app.use('/api/catalogo', catalogoRouter)
+app.use('/api/edan', edanRoutes)
 
 app.get('/api/health', (req, res) => res.json({ ok: true }))
 
@@ -29,6 +31,6 @@ try {
   process.exit(1)
 }
 
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`Servidor en http://localhost:${PORT}`)
 })
