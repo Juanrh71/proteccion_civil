@@ -1,8 +1,16 @@
 <template>
   <div class="registrar-view">
     <h1 class="page-title">Registrar Incidente</h1>
+    <div class="registro-tabs card">
+      <button type="button" class="tab-btn" :class="{ activo: vistaRegistro === 'incidente' }" @click="vistaRegistro = 'incidente'">
+        Incidente
+      </button>
+      <button type="button" class="tab-btn" :class="{ activo: vistaRegistro === 'edan' }" @click="vistaRegistro = 'edan'">
+        EDAN
+      </button>
+    </div>
 
-    <form @submit.prevent="enviar" class="form-registro card">
+    <form v-if="vistaRegistro === 'incidente'" @submit.prevent="enviar" class="form-registro card">
       <div class="form-col">
         <div class="form-row form-row-triple">
           <div class="form-group">
@@ -55,7 +63,7 @@
                 v-model="municipioQuery"
                 type="text"
                 class="combo-input"
-                placeholder="Escriba para buscar (opcional)…"
+                placeholder="Escriba para buscar y seleccione…"
                 autocomplete="off"
                 aria-autocomplete="list"
                 :aria-expanded="abrirMunicipio"
@@ -102,7 +110,7 @@
 
         <div class="form-group">
           <label>Calle, avenida o referencia</label>
-          <input v-model="form.via" type="text" class="input" maxlength="500" />
+          <input v-model="form.via" type="text" class="input" maxlength="500" required />
         </div>
 
         <div class="form-group">
@@ -136,13 +144,32 @@
         </div>
       </div>
     </form>
+
+    <section v-else class="card edan-panel">
+      <EdanWizard
+        :key="edanResetKey"
+        :initial-data="edanFormInicial"
+        :submitting="enviandoEdan"
+        mode="create"
+        submit-label="Registrar EDAN"
+        @submit="enviarEdan"
+      />
+      <p v-if="mensajeEdan" :class="mensajeEdanOk ? 'msg ok' : 'msg error'">{{ mensajeEdan }}</p>
+    </section>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import MapaCarabobo from '../components/MapaCarabobo.vue'
-import { TIPOS_INCIDENTE, MUNICIPIOS_CARABOBO, MAPA_CENTRO_CARABOBO, PARROQUIAS_POR_MUNICIPIO } from '../config/incidentes'
+import EdanWizard from '../components/EdanWizard.vue'
+import {
+  TIPOS_INCIDENTE,
+  MUNICIPIOS_CARABOBO,
+  MAPA_CENTRO_CARABOBO,
+  MAPA_BOUNDS_CARABOBO,
+  PARROQUIAS_POR_MUNICIPIO,
+} from '../config/incidentes'
 import {
   GRUPOS_EXCEL,
   CATEGORIAS_EXCEL_REGISTRO,
@@ -150,10 +177,61 @@ import {
 } from '../utils/clasificacionExcelIncidentes.js'
 import { useCatalogoIncidentes } from '../composables/useCatalogoIncidentes'
 import { guardarIncidente } from '../api/incidentes'
+import { registrarEdan } from '../api/edan.js'
+import { getUsuario } from '../api/auth.js'
 import { obtenerUbicacionInversa } from '../api/geocoding.js'
 
 const fechaHoraVista = ref('')
 let relojIntervalId = null
+const vistaRegistro = ref('incidente')
+const enviandoEdan = ref(false)
+const mensajeEdan = ref('')
+const mensajeEdanOk = ref(false)
+const edanResetKey = ref(0)
+
+const edanFormInicial = computed(() => ({
+  numero_planilla: '',
+  propetario: '',
+  p_cedula: '',
+  P_edad: 0,
+  P_telefono: '',
+  municipio: '',
+  parroquia: '',
+  sector: '',
+  nro_casa: '',
+  urbanizacion: '',
+  direccion: '',
+  lat: null,
+  lng: null,
+  nro_informe: '',
+  fecha_solicitud: '',
+  fecha_afectacion: '',
+  descripcion_afectacion: '',
+  tipo_afectacion: '',
+  afectacion_otros: '',
+  condicion_vivienda: '',
+  tipo_vivienda: '',
+  descripcion_vivienda: '',
+  lact_Fem: 0,
+  lact_Masc: 0,
+  ninos_Fem: 0,
+  ninos_Masc: 0,
+  adultos_Fem: 0,
+  adultos_Masc: 0,
+  tercera_edad_Fem: 0,
+  tercera_edad_Masc: 0,
+  discapacitados: 0,
+  total_personas: 0,
+  nro_familias: 0,
+  requerimientos_afectacion: '',
+  P_enseres_total: '',
+  P_enseres_parcial: '',
+  p_enseres_no: '',
+  necesidades_agua: '',
+  necesidades_alimentos: '',
+  necesidades_luz: '',
+  detalles_familiares: [],
+}))
 
 function actualizarRelojVista() {
   fechaHoraVista.value = new Date().toLocaleString('es-VE', {
@@ -470,6 +548,14 @@ function viaDesdeLabelBusqueda(label) {
   return primera
 }
 
+function coordenadasEnCarabobo(lat, lng) {
+  const nLat = Number(lat)
+  const nLng = Number(lng)
+  if (!Number.isFinite(nLat) || !Number.isFinite(nLng)) return false
+  const [[minLat, minLng], [maxLat, maxLng]] = MAPA_BOUNDS_CARABOBO
+  return nLat >= minLat && nLat <= maxLat && nLng >= minLng && nLng <= maxLng
+}
+
 async function aplicarReverseDesdeCoordenadasRegistrar(lat, lng, labelBusqueda) {
   const seq = ++secuenciaReverseRegistrar
   const u = await obtenerUbicacionInversa(lat, lng)
@@ -487,6 +573,11 @@ async function aplicarReverseDesdeCoordenadasRegistrar(lat, lng, labelBusqueda) 
 }
 
 async function asignarCoordenadas(coords) {
+  if (!coordenadasEnCarabobo(coords.lat, coords.lng)) {
+    mensaje.value = 'Solo se permiten ubicaciones dentro del estado Carabobo.'
+    mensajeOk.value = false
+    return
+  }
   form.value.lat = coords.lat
   form.value.lng = coords.lng
   const label = coords.label != null ? String(coords.label) : ''
@@ -526,6 +617,29 @@ async function enviar() {
     mensajeOk.value = false
     return
   }
+  const viaTrim = String(form.value.via || '').trim()
+  if (!viaTrim) {
+    mensaje.value = 'La calle, avenida o referencia es obligatoria.'
+    mensajeOk.value = false
+    return
+  }
+  if (!form.value.municipio || !MUNICIPIOS_CARABOBO.includes(form.value.municipio)) {
+    mensaje.value = 'Debe seleccionar un municipio válido de Carabobo.'
+    mensajeOk.value = false
+    return
+  }
+  const tieneLat = form.value.lat != null && form.value.lat !== ''
+  const tieneLng = form.value.lng != null && form.value.lng !== ''
+  if (tieneLat !== tieneLng) {
+    mensaje.value = 'Si indica coordenadas, debe colocar latitud y longitud.'
+    mensajeOk.value = false
+    return
+  }
+  if (tieneLat && !coordenadasEnCarabobo(form.value.lat, form.value.lng)) {
+    mensaje.value = 'Las coordenadas deben estar dentro del estado Carabobo.'
+    mensajeOk.value = false
+    return
+  }
   const catSel = categoriasSelect.value.find((c) => c.id === form.value.categoria_grupo)
   const tipoSel = tiposActivosLista.value.find((t) => t.id === form.value.tipo)
   enviando.value = true
@@ -538,7 +652,7 @@ async function enviar() {
       categoria_nombre: catSel ? catSel.nombre : '',
       municipio: form.value.municipio,
       parroquia: form.value.parroquia,
-      via: form.value.via,
+      via: viaTrim,
       lat: form.value.lat,
       lng: form.value.lng,
       fecha: new Date().toISOString(),
@@ -560,6 +674,41 @@ async function enviar() {
   }
   enviando.value = false
 }
+
+function limpiarEdan() {
+  mensajeEdan.value = ''
+  mensajeEdanOk.value = false
+  edanResetKey.value += 1
+}
+
+async function enviarEdan(payload) {
+  const usuario = getUsuario()
+  const idOficial = Number(usuario?.id)
+  if (!Number.isFinite(idOficial) || idOficial < 1) {
+    mensajeEdan.value = 'No se pudo identificar al usuario para registrar EDAN. Inicie sesion nuevamente.'
+    mensajeEdanOk.value = false
+    return
+  }
+  enviandoEdan.value = true
+  mensajeEdan.value = ''
+  try {
+    await registrarEdan({
+      ...payload,
+      id_oficial: idOficial,
+    })
+    mensajeEdan.value = 'Formulario EDAN registrado correctamente.'
+    mensajeEdanOk.value = true
+    edanResetKey.value += 1
+  } catch (e) {
+    let msg = 'Error al registrar EDAN.'
+    if (e?.response?.data?.error) msg = e.response.data.error
+    else if (e?.message) msg = e.message
+    mensajeEdan.value = msg
+    mensajeEdanOk.value = false
+  } finally {
+    enviandoEdan.value = false
+  }
+}
 </script>
 
 <style scoped>
@@ -573,6 +722,28 @@ async function enviar() {
 .page-title {
   margin-bottom: 0.5rem;
   font-size: 1.35rem;
+}
+.registro-tabs {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  margin-bottom: 0.6rem;
+}
+.tab-btn {
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  color: var(--color-secondary);
+  border-radius: 8px;
+  padding: 0.45rem 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.tab-btn.activo {
+  border-color: #0033cc;
+  background: #eef4ff;
+}
+.edan-panel {
+  padding: 0.75rem;
 }
 .form-registro {
   flex: 1;

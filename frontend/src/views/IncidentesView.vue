@@ -2,14 +2,44 @@
   <div class="incidentes-view">
     <div class="titulo-acciones">
       <h1 class="page-title">Listado de Incidentes</h1>
-      <button type="button" class="btn btn-secondary" :disabled="descargandoPdf" @click="descargarPdf">
+      <button
+        v-if="vistaContenido === 'incidentes'"
+        type="button"
+        class="btn btn-secondary"
+        :disabled="descargandoPdf"
+        @click="descargarPdf"
+      >
         {{ descargandoPdf ? 'Generando PDF…' : 'Descargar PDF' }}
       </button>
     </div>
+    <div class="contenido-tabs card">
+      <button
+        type="button"
+        class="tab-btn"
+        :class="{ activo: vistaContenido === 'incidentes' }"
+        @click="vistaContenido = 'incidentes'"
+      >
+        Incidentes
+      </button>
+      <button
+        type="button"
+        class="tab-btn"
+        :class="{ activo: vistaContenido === 'edan' }"
+        @click="vistaContenido = 'edan'"
+      >
+        EDAN
+      </button>
+    </div>
     <p v-if="avisoResultadoGuardado" class="aviso-resultado" role="status">{{ avisoResultadoGuardado }}</p>
-    <p v-if="errorCargaLista" class="aviso-lista-error" role="alert">{{ errorCargaLista }}</p>
+    <p v-if="vistaContenido === 'incidentes' && errorCargaLista" class="aviso-lista-error" role="alert">{{ errorCargaLista }}</p>
+    <p v-if="vistaContenido === 'edan' && errorCargaEdan" class="aviso-lista-error" role="alert">{{ errorCargaEdan }}</p>
 
-    <div class="vista-por-estado card" role="tablist" aria-label="Filtrar listado por estado del incidente">
+    <div
+      v-if="vistaContenido === 'incidentes'"
+      class="vista-por-estado card"
+      role="tablist"
+      aria-label="Filtrar listado por estado del incidente"
+    >
       <div class="vista-por-estado-inner">
         <button
           type="button"
@@ -50,7 +80,7 @@
       </div>
     </div>
 
-    <div class="filtros card">
+    <div v-if="vistaContenido === 'incidentes'" class="filtros card">
       <div class="filtros-row">
         <div class="form-group">
           <label>Tipo</label>
@@ -137,7 +167,7 @@
       </div>
     </div>
 
-    <div class="card incidentes-card">
+    <div v-if="vistaContenido === 'incidentes'" class="card incidentes-card">
       <div class="tabla-wrap">
         <table class="tabla">
           <thead>
@@ -268,6 +298,60 @@
       </div>
       <p v-if="incidentesFiltrados.length === 0" class="sin-datos">No hay incidentes que coincidan con los filtros.</p>
       <p class="total">Total: {{ incidentesFiltrados.length }} incidente(s)</p>
+    </div>
+
+    <div v-else class="card edan-card">
+      <div class="edan-head">
+        <h2 class="comparativa-viz-titulo">Reportes EDAN</h2>
+        <div class="edan-buscar">
+          <label for="buscar-planilla-edan">Buscar por numero de planilla</label>
+          <input
+            id="buscar-planilla-edan"
+            v-model="filtroPlanillaEdan"
+            type="text"
+            class="input"
+            placeholder="Escriba numero de planilla…"
+          />
+        </div>
+      </div>
+      <div class="tabla-wrap tabla-wrap-edan">
+        <table class="tabla">
+          <thead>
+            <tr>
+              <th class="th-n">N°</th>
+              <th>Fecha reporte</th>
+              <th>Planilla</th>
+              <th>Propietario</th>
+              <th>Municipio</th>
+              <th>Parroquia</th>
+              <th>Afectacion</th>
+              <th>Total personas</th>
+              <th class="th-acc">Acc.</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="e in edanListaFiltrada" :key="e.id">
+              <td>{{ e.id }}</td>
+              <td>{{ formatearFecha(e.fecha_reporte) }}</td>
+              <td>{{ e.numero_planilla || '-' }}</td>
+              <td>{{ e.propetario || '-' }}</td>
+              <td>{{ e.municipio || '-' }}</td>
+              <td>{{ e.parroquia || '-' }}</td>
+              <td>{{ e.tipo_afectacion || '-' }}</td>
+              <td>{{ e.total_personas ?? 0 }}</td>
+              <td class="acciones-cell">
+                <button type="button" class="btn btn-icon btn-icon--editar" title="Editar EDAN" @click="abrirEditarEdan(e)">
+                  <svg class="btn-icon-svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <path fill="currentColor" d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1.003 1.003 0 0 0 0-1.42l-2.34-2.34a1.003 1.003 0 0 0-1.42 0l-1.83 1.83 3.75 3.75 1.84-1.82z" />
+                  </svg>
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p v-if="edanListaFiltrada.length === 0" class="sin-datos">No hay reportes EDAN que coincidan con la búsqueda.</p>
+      <p class="total">Total EDAN: {{ edanListaFiltrada.length }} reporte(s)</p>
     </div>
 
     <div v-if="mostrarModal" class="modal-overlay" @click.self="cerrarModal">
@@ -465,12 +549,26 @@
         </div>
       </div>
     </div>
+
+    <div v-if="mostrarModalEdan" class="modal-overlay modal-overlay--encima" @click.self="cerrarModalEdan">
+      <div class="modal card modal-edan" role="dialog" aria-label="Editar formulario EDAN">
+        <EdanWizard
+          :initial-data="edanEditData"
+          :submitting="guardandoEdan"
+          mode="edit"
+          submit-label="Guardar EDAN"
+          @submit="guardarEdanEditado"
+          @cancel="cerrarModalEdan"
+        />
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import MapaCarabobo from '../components/MapaCarabobo.vue'
+import EdanWizard from '../components/EdanWizard.vue'
 import {
   obtenerIncidentes,
   actualizarIncidente,
@@ -487,6 +585,7 @@ import {
   textoVictimasCierre,
   tieneRegistroVictimasCierre,
 } from '../utils/resultadoIncidente.js'
+import { actualizarEdan, listarEdan, obtenerEdanPorId } from '../api/edan.js'
 
 const { categorias, tiposPlano } = useCatalogoIncidentes()
 
@@ -498,6 +597,7 @@ const tiposFiltroOpciones = computed(() => {
 })
 
 const incidentes = ref([])
+const vistaContenido = ref('incidentes')
 const vistaLista = ref('abiertos')
 const filtroTipo = ref('')
 const filtroMunicipios = ref([])
@@ -533,12 +633,19 @@ const enviandoResultadoCierre = ref(false)
 const cierreDesdeEnProceso = computed(() => incidenteResultadoCierre.value?.estado === 'en_proceso')
 const avisoResultadoGuardado = ref('')
 const errorCargaLista = ref('')
+const errorCargaEdan = ref('')
 const mostrarModalVerResultado = ref(false)
 const incidenteVerResultado = ref(null)
 const ahoraMs = ref(Date.now())
 const listaFetchMs = ref(Date.now())
 let relojEdicion = null
 let secuenciaReverseMunicipio = 0
+const edanLista = ref([])
+const filtroPlanillaEdan = ref('')
+const mostrarModalEdan = ref(false)
+const guardandoEdan = ref(false)
+const edanEditData = ref({})
+const edanEditId = ref(null)
 
 const formEditar = ref({
   municipio: '',
@@ -603,6 +710,15 @@ const incidentesFiltrados = computed(() => {
     return new Date(b.fecha).getTime() - new Date(a.fecha).getTime()
   })
   return salida
+})
+
+const edanListaFiltrada = computed(() => {
+  const query = normalizarBusqueda(filtroPlanillaEdan.value.trim())
+  if (!query) return edanLista.value
+  return edanLista.value.filter((e) => {
+    const planilla = e?.numero_planilla != null ? normalizarBusqueda(String(e.numero_planilla)) : ''
+    return planilla.includes(query)
+  })
 })
 
 const parroquiasOpcionesFiltro = computed(() => {
@@ -916,6 +1032,54 @@ function cerrarModalVerResultado() {
   incidenteVerResultado.value = null
 }
 
+async function cargarEdanLista() {
+  try {
+    const rows = await listarEdan()
+    edanLista.value = rows.sort((a, b) => {
+      const ta = a?.fecha_reporte ? new Date(a.fecha_reporte).getTime() : 0
+      const tb = b?.fecha_reporte ? new Date(b.fecha_reporte).getTime() : 0
+      return tb - ta
+    })
+    errorCargaEdan.value = ''
+  } catch (e) {
+    errorCargaEdan.value = e?.response?.data?.error || e?.message || 'No se pudo cargar EDAN.'
+  }
+}
+
+async function abrirEditarEdan(row) {
+  if (!row?.id) return
+  try {
+    const data = await obtenerEdanPorId(row.id)
+    edanEditData.value = data || {}
+    edanEditId.value = row.id
+    mostrarModalEdan.value = true
+  } catch (e) {
+    const msg = e?.response?.data?.error || e?.message || 'No se pudo abrir el EDAN.'
+    alert(msg)
+  }
+}
+
+function cerrarModalEdan() {
+  mostrarModalEdan.value = false
+  edanEditId.value = null
+  edanEditData.value = {}
+}
+
+async function guardarEdanEditado(payload) {
+  if (!edanEditId.value) return
+  guardandoEdan.value = true
+  try {
+    await actualizarEdan(edanEditId.value, payload)
+    await cargarEdanLista()
+    cerrarModalEdan()
+  } catch (e) {
+    const msg = e?.response?.data?.error || e?.message || 'No se pudo guardar el EDAN.'
+    alert(msg)
+  } finally {
+    guardandoEdan.value = false
+  }
+}
+
 async function enviarResultadoCierre() {
   const inc = incidenteResultadoCierre.value
   const t = textoResultadoCierre.value.trim()
@@ -1019,6 +1183,7 @@ onMounted(async () => {
   } catch (e) {
     errorCargaLista.value = e?.message || 'No se pudo cargar el listado.'
   }
+  await cargarEdanLista()
   logoPdfDataUrl.value = await cargarLogoBase64()
   relojEdicion = setInterval(() => {
     ahoraMs.value = Date.now()
@@ -1040,6 +1205,26 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+.contenido-tabs {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  margin-bottom: 0.45rem;
+  flex-shrink: 0;
+}
+.tab-btn {
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  color: var(--color-secondary);
+  border-radius: 8px;
+  padding: 0.45rem 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.tab-btn.activo {
+  border-color: #0033cc;
+  background: #eef4ff;
 }
 .titulo-acciones {
   display: flex;
@@ -1156,9 +1341,38 @@ onUnmounted(() => {
   flex-direction: column;
   padding: 0.6rem 0.75rem 0.5rem;
 }
+.edan-card {
+  margin-top: 0.5rem;
+  padding: 0.6rem 0.75rem 0.5rem;
+}
+.edan-head {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-bottom: 0.4rem;
+}
+.edan-buscar {
+  max-width: 360px;
+}
+.edan-buscar label {
+  display: block;
+  margin-bottom: 0.3rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-secondary);
+}
+.edan-head h2 {
+  margin: 0;
+  font-size: 1rem;
+  color: var(--color-secondary);
+}
+.tabla-wrap-edan {
+  max-height: 360px;
+}
 .tabla-wrap {
   flex: 1 1 0;
   min-height: 8.5rem;
+  max-height: none;
   overflow-x: auto;
   overflow-y: auto;
 }
@@ -1259,6 +1473,10 @@ onUnmounted(() => {
   color: var(--color-text-muted);
   border-top: 1px solid #e2e8f0;
   flex-shrink: 0;
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  background: var(--color-surface-card, #fff);
 }
 .leyenda-acciones {
   display: flex;
@@ -1564,6 +1782,9 @@ onUnmounted(() => {
 }
 .modal-editar {
   max-width: 640px;
+}
+.modal-edan {
+  max-width: 1080px;
 }
 .coords-row {
   display: flex;

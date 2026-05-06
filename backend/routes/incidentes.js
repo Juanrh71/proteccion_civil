@@ -7,6 +7,26 @@ import pool from '../db/connection.js'
 
 const router = Router()
 const JWT_SECRET = process.env.JWT_SECRET || 'clave_secreta_cambiar_en_produccion'
+const MUNICIPIOS_CARABOBO = [
+  'Valencia',
+  'Naguanagua',
+  'San Diego',
+  'Guacara',
+  'Mariara',
+  'Diego Ibarra',
+  'Puerto Cabello',
+  'Juan José Mora',
+  'Bejuma',
+  'Miranda',
+  'Montalbán',
+  'Carlos Arvelo',
+]
+const CARABOBO_BOUNDS = {
+  minLat: 9.95,
+  maxLat: 10.48,
+  minLng: -68.55,
+  maxLng: -67.32,
+}
 
 /** Id de usuario autenticado (Bearer) o null */
 function idUsuarioAutenticado(req) {
@@ -104,6 +124,48 @@ function coorANumeroONull(v) {
   if (v == null || v === '') return null
   const n = Number(v)
   return Number.isFinite(n) ? n : null
+}
+
+function normalizarTexto(s) {
+  return String(s || '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '')
+}
+
+function municipioEsCarabobo(municipio) {
+  const mNorm = normalizarTexto(municipio)
+  if (!mNorm) return false
+  return MUNICIPIOS_CARABOBO.some((m) => normalizarTexto(m) === mNorm)
+}
+
+function coordenadasEnCarabobo(lat, lng) {
+  return (
+    lat >= CARABOBO_BOUNDS.minLat &&
+    lat <= CARABOBO_BOUNDS.maxLat &&
+    lng >= CARABOBO_BOUNDS.minLng &&
+    lng <= CARABOBO_BOUNDS.maxLng
+  )
+}
+
+function validarUbicacionIncidente({ municipio, via, lat, lng }) {
+  const viaTrim = String(via || '').trim()
+  if (!viaTrim) {
+    return 'La calle, avenida o referencia es obligatoria.'
+  }
+  if (!municipioEsCarabobo(municipio)) {
+    return 'Solo se permiten municipios del estado Carabobo.'
+  }
+  const tieneLat = lat != null
+  const tieneLng = lng != null
+  if (tieneLat !== tieneLng) {
+    return 'Debe indicar latitud y longitud juntas.'
+  }
+  if (tieneLat && !coordenadasEnCarabobo(lat, lng)) {
+    return 'Las coordenadas deben ubicarse dentro del estado Carabobo.'
+  }
+  return ''
 }
 
 function enteroONull(v) {
@@ -261,15 +323,24 @@ router.post('/reportar', upload.single('evidencia'), async (req, res) => {
 
     const latVal = coorANumeroONull(lat)
     const lngVal = coorANumeroONull(lng)
+    const errorUbicacion = validarUbicacionIncidente({
+      municipio,
+      via,
+      lat: latVal,
+      lng: lngVal,
+    })
+    if (errorUbicacion) {
+      return res.status(400).json({ error: errorUbicacion })
+    }
 
     const [result] = await pool.query(sql, [
       idRep,
       descripcion || '',
       latVal,
       lngVal,
-      municipio || null,
+      String(municipio).trim(),
       parroquia || null,
-      via || null,
+      String(via).trim(),
       procDb,
       evidencia_visual,
       estadoAfectados,
@@ -373,6 +444,15 @@ router.post('/', async (req, res) => {
     }
     const latVal = coorANumeroONull(lat)
     const lngVal = coorANumeroONull(lng)
+    const errorUbicacion = validarUbicacionIncidente({
+      municipio,
+      via,
+      lat: latVal,
+      lng: lngVal,
+    })
+    if (errorUbicacion) {
+      return res.status(400).json({ error: errorUbicacion })
+    }
     const [result] = await pool.query(
       `INSERT INTO incidentes (tipo, tipo_nombre, categoria, descripcion, lat, lng, municipio, parroquia, via, fecha, cerrado, estado, id_de_reportante, tipo_de_reportante)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 'abierto', ?, 'ciudadano')`,
@@ -383,9 +463,9 @@ router.post('/', async (req, res) => {
         descripcion || '',
         latVal,
         lngVal,
-        municipio || null,
+        String(municipio).trim(),
         parroquia != null && String(parroquia).trim() !== '' ? String(parroquia).trim() : null,
-        via != null && String(via).trim() !== '' ? String(via).trim() : null,
+        String(via).trim(),
         fecha ? new Date(fecha) : new Date(),
         idReportante,
       ]
@@ -538,7 +618,16 @@ router.put('/:id', async (req, res) => {
     }
     const latVal = coorANumeroONull(lat)
     const lngVal = coorANumeroONull(lng)
-    const viaVal = via != null && String(via).trim() !== '' ? String(via).trim() : null
+    const errorUbicacion = validarUbicacionIncidente({
+      municipio,
+      via,
+      lat: latVal,
+      lng: lngVal,
+    })
+    if (errorUbicacion) {
+      return res.status(400).json({ error: errorUbicacion })
+    }
+    const viaVal = String(via).trim()
     const [result] = await pool.query(
       `UPDATE incidentes SET tipo = ?, tipo_nombre = ?, categoria = ?, descripcion = ?, lat = ?, lng = ?, municipio = ?, parroquia = ?, via = ? WHERE id = ?`,
       [
@@ -548,7 +637,7 @@ router.put('/:id', async (req, res) => {
         descripcion || '',
         latVal,
         lngVal,
-        municipio || null,
+        String(municipio).trim(),
         parroquia != null && String(parroquia).trim() !== '' ? String(parroquia).trim() : null,
         viaVal,
         id,

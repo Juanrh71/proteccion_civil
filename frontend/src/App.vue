@@ -20,7 +20,11 @@ onMounted(() => {
   cargarCatalogoIncidentes()
 })
 const scrollPrincipal = computed(
-  () => route.name === 'Dashboard' || route.name === 'Reportes' || route.name === 'Usuarios'
+  () =>
+    route.name === 'Dashboard' ||
+    route.name === 'Reportes' ||
+    route.name === 'Usuarios' ||
+    route.name === 'Registrar'
 )
 </script>
 
