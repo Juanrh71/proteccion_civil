@@ -56,7 +56,17 @@
       </section>
 
       <div class="card tabla-card">
-        <div v-if="lista.length === 0" class="lista-vacio">No hay incidentes registrados para esta fecha.</div>
+        <div v-if="lista.length === 0" class="lista-vacio">
+          <p class="lista-vacio-texto">No hay incidentes registrados para esta fecha.</p>
+          <button
+            v-if="fechaUltimoIncidente"
+            type="button"
+            class="btn btn-secondary lista-vacio-btn"
+            @click="irAFechaUltimoIncidente"
+          >
+            Ver reportes más recientes ({{ etiquetaFechaUltimoIncidente }})
+          </button>
+        </div>
         <div v-else class="tabla-wrap">
           <table class="tabla">
             <thead>
@@ -342,6 +352,31 @@ const etiquetaFechaSeleccionada = computed(() => {
   const nombreMes = MESES[filtroMes.value - 1] || ''
   return `${filtroDia.value} de ${nombreMes} de ${filtroAno.value}`
 })
+
+const fechaUltimoIncidente = computed(() => {
+  let mejor = null
+  for (const inc of incidentes.value) {
+    const d = parseFechaInc(inc)
+    if (!d) continue
+    if (!mejor || d.getTime() > mejor.getTime()) mejor = d
+  }
+  return mejor
+})
+
+const etiquetaFechaUltimoIncidente = computed(() => {
+  const d = fechaUltimoIncidente.value
+  if (!d) return ''
+  const nombreMes = MESES[d.getMonth()] || ''
+  return `${d.getDate()} de ${nombreMes} de ${d.getFullYear()}`
+})
+
+function irAFechaUltimoIncidente() {
+  const d = fechaUltimoIncidente.value
+  if (!d) return
+  filtroAno.value = d.getFullYear()
+  filtroMes.value = d.getMonth() + 1
+  filtroDia.value = d.getDate()
+}
 
 function formatearFecha(fecha) {
   if (!fecha) return '—'
@@ -629,6 +664,9 @@ onMounted(async () => {
   } catch (e) {
     errorCarga.value = e?.message || 'No se pudieron cargar los incidentes.'
   }
+  if (lista.value.length === 0 && fechaUltimoIncidente.value) {
+    irAFechaUltimoIncidente()
+  }
   if (!aniosDisponiblesComparativa.value.includes(anioComparativa.value)) {
     anioComparativa.value = aniosDisponiblesComparativa.value[0] || añoSugeridoParaIncidentes()
   }
@@ -897,9 +935,19 @@ onMounted(async () => {
 }
 
 .lista-vacio {
-  padding: 2rem;
+  padding: 1.5rem 1rem;
   text-align: center;
   color: var(--color-text-muted);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.65rem;
+}
+.lista-vacio-texto {
+  margin: 0;
+}
+.lista-vacio-btn {
+  font-size: 0.85rem;
 }
 
 .badge-estado {

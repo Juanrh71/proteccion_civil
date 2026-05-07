@@ -399,6 +399,32 @@ export async function ensureIncidentesSchema() {
           console.warn('[db] incidentes.created_at:', e.message)
         }
       }
+      if (!(await hasColumn(dbName, 'incidentes', 'tipo_nombre'))) {
+        try {
+          await pool.query('ALTER TABLE incidentes ADD COLUMN tipo_nombre VARCHAR(255) NULL')
+          if (await hasColumn(dbName, 'incidentes', 'nombre_incidente')) {
+            await pool.query(
+              'UPDATE incidentes SET tipo_nombre = nombre_incidente WHERE tipo_nombre IS NULL'
+            )
+          }
+          console.log('[db] Columna incidentes.tipo_nombre añadida (migración legacy).')
+        } catch (e) {
+          console.warn('[db] incidentes.tipo_nombre:', e.message)
+        }
+      }
+      if (!(await hasColumn(dbName, 'incidentes', 'fecha'))) {
+        try {
+          await pool.query('ALTER TABLE incidentes ADD COLUMN fecha DATETIME NULL')
+          if (await hasColumn(dbName, 'incidentes', 'created_at')) {
+            await pool.query(
+              'UPDATE incidentes SET fecha = created_at WHERE fecha IS NULL'
+            )
+          }
+          console.log('[db] Columna incidentes.fecha añadida (migración legacy).')
+        } catch (e) {
+          console.warn('[db] incidentes.fecha:', e.message)
+        }
+      }
       if (!(await hasColumn(dbName, 'incidentes', 'tipo_de_reportante'))) {
         try {
           await pool.query(
