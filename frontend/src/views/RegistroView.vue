@@ -20,9 +20,55 @@
       <template v-if="esModoAdmin">
         <div v-if="!panelAdmin" class="admin-intro">
           <span class="admin-pill">Administraci&oacute;n</span>
-          <p class="admin-lead">Elija una acci&oacute;n. Los usuarios creados aqu&iacute; quedan como <strong>oficial</strong>.</p>
+          <p class="admin-lead">Elija una vista de monitoreo o una acci&oacute;n de gesti&oacute;n.</p>
         </div>
         <div v-if="!panelAdmin" class="admin-menu">
+          <button type="button" class="admin-menu-card" @click="irASeccion('/dashboard')">
+            <span class="admin-menu-ico admin-menu-ico--add" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="4" width="18" height="16" rx="2" />
+                <line x1="7" y1="9" x2="17" y2="9" />
+                <line x1="7" y1="13" x2="17" y2="13" />
+                <line x1="7" y1="17" x2="12" y2="17" />
+              </svg>
+            </span>
+            <span class="admin-menu-text">
+              <span class="admin-menu-title">Dashboard</span>
+              <span class="admin-menu-desc">Vista operativa en tiempo real y tendencias generales.</span>
+            </span>
+            <span class="admin-menu-arrow" aria-hidden="true">&rarr;</span>
+          </button>
+          <button type="button" class="admin-menu-card" @click="irASeccion('/reportes')">
+            <span class="admin-menu-ico admin-menu-ico--list" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="5" y1="6" x2="19" y2="6" />
+                <line x1="5" y1="12" x2="19" y2="12" />
+                <line x1="5" y1="18" x2="19" y2="18" />
+                <circle cx="4" cy="6" r="1" />
+                <circle cx="4" cy="12" r="1" />
+                <circle cx="4" cy="18" r="1" />
+              </svg>
+            </span>
+            <span class="admin-menu-text">
+              <span class="admin-menu-title">Reportes</span>
+              <span class="admin-menu-desc">Comparativas, indicadores y reportes de incidentes.</span>
+            </span>
+            <span class="admin-menu-arrow" aria-hidden="true">&rarr;</span>
+          </button>
+          <button type="button" class="admin-menu-card" @click="irASeccion('/mapa')">
+            <span class="admin-menu-ico admin-menu-ico--catalog" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M3 11l9-7 9 7" />
+                <path d="M5 10v9h14v-9" />
+                <path d="M10 19v-4h4v4" />
+              </svg>
+            </span>
+            <span class="admin-menu-text">
+              <span class="admin-menu-title">Mapa en vivo</span>
+              <span class="admin-menu-desc">Seguimiento de incidentes y ubicaciones activas.</span>
+            </span>
+            <span class="admin-menu-arrow" aria-hidden="true">&rarr;</span>
+          </button>
           <button type="button" class="admin-menu-card" @click="abrirPanel('registrar')">
             <span class="admin-menu-ico admin-menu-ico--add" aria-hidden="true">
               <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
@@ -563,6 +609,10 @@ function abrirPanel(panel) {
   } else if (panel === 'catalogo') {
     cargarCatalogoAdminData()
   }
+}
+
+function irASeccion(ruta) {
+  router.push(ruta)
 }
 
 async function cargarCatalogoAdminData() {

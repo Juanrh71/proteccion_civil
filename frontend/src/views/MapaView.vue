@@ -1,6 +1,16 @@
 <template>
   <div class="mapa-view">
-    <h1 class="page-title">Mapa en vivo</h1>
+    <div class="mapa-head">
+      <h1 class="page-title">Mapa en vivo</h1>
+      <button
+        v-if="esAdmin"
+        type="button"
+        class="btn-menu-admin"
+        @click="irMenuAdmin"
+      >
+        Menú principal
+      </button>
+    </div>
     <div class="estado-bar card">
       <span class="activas">
         Emergencias activas: <strong>{{ incidentes.length }}</strong>
@@ -27,10 +37,15 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { useRouter } from 'vue-router'
 import MapaCarabobo from '../components/MapaCarabobo.vue'
 import { obtenerIncidentes } from '../api/incidentes'
 import { useCatalogoIncidentes } from '../composables/useCatalogoIncidentes.js'
+import { useAuth } from '../composables/useAuth'
 
+const router = useRouter()
+const { usuario } = useAuth()
+const esAdmin = computed(() => usuario.value?.rol === 'admin')
 const { leyendaMapa } = useCatalogoIncidentes()
 const incidentes = ref([])
 const actualizando = ref(false)
@@ -47,6 +62,10 @@ const ultimaActualizacionTexto = computed(() => {
 })
 
 const categoriasLeyenda = leyendaMapa
+
+function irMenuAdmin() {
+  router.push('/usuarios')
+}
 
 async function refrescar() {
   actualizando.value = true
@@ -92,6 +111,29 @@ onUnmounted(() => {
   flex-direction: column;
   gap: 0.55rem;
   overflow: hidden;
+}
+
+.mapa-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.btn-menu-admin {
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  color: var(--color-secondary);
+  border-radius: var(--radius, 8px);
+  padding: 0.45rem 0.8rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.btn-menu-admin:hover {
+  background: #eef2ff;
 }
 .estado-bar {
   display: flex;

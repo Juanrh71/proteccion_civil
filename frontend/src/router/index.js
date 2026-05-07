@@ -73,11 +73,11 @@ router.beforeEach((to, _from, next) => {
     return
   }
   if (token && usuario?.rol === 'admin' && to.path === '/') {
-    next('/usuarios')
+    next('/dashboard')
     return
   }
   if (to.path === '/login' && token) {
-    next(usuario?.rol === 'admin' ? '/usuarios' : '/')
+    next(usuario?.rol === 'admin' ? '/dashboard' : '/')
     return
   }
   next()

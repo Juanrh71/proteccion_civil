@@ -2,6 +2,14 @@
   <div class="reportes-lista-view">
     <div class="titulo-acciones">
       <h1 class="page-title">Reportes</h1>
+      <button
+        v-if="esAdmin"
+        type="button"
+        class="btn btn-secondary"
+        @click="irMenuAdmin"
+      >
+        Menú principal
+      </button>
     </div>
     <p v-if="errorCarga" class="reportes-error" role="alert">{{ errorCarga }}</p>
 
@@ -229,6 +237,7 @@
 
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -248,6 +257,7 @@ import {
   tieneRegistroVictimasCierre,
 } from '../utils/resultadoIncidente.js'
 import { descargarPdfComparativaHistorica } from '../utils/pdfComparativaHistorica.js'
+import { useAuth } from '../composables/useAuth'
 import {
   RANGO_ANO_INICIO,
   RANGO_ANO_FIN,
@@ -260,6 +270,10 @@ import {
 } from '../utils/clasificacionExcelIncidentes.js'
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, BarController, Tooltip, Legend)
+
+const router = useRouter()
+const { usuario } = useAuth()
+const esAdmin = computed(() => usuario.value?.rol === 'admin')
 
 const MESES = [
   'Enero',
@@ -382,6 +396,10 @@ function formatearFecha(fecha) {
   if (!fecha) return '—'
   const d = new Date(fecha)
   return d.toLocaleString('es-VE')
+}
+
+function irMenuAdmin() {
+  router.push('/usuarios')
 }
 
 function textoEstadoListado(inc) {

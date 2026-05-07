@@ -8,7 +8,7 @@
       <nav class="nav">
         <template v-if="estaAutenticado">
           <template v-if="esAdmin">
-            <router-link to="/usuarios" class="nav-link">Usuarios</router-link>
+            <router-link to="/usuarios" class="nav-link">Panel administrador</router-link>
           </template>
           <template v-else>
             <router-link to="/" class="nav-link">Inicio</router-link>

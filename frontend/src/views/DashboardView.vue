@@ -1,7 +1,17 @@
 <template>
   <div class="dashboard">
     <header class="dashboard-head">
-      <h1 class="dashboard-title">Dashboard</h1>
+      <div class="dashboard-head-top">
+        <h1 class="dashboard-title">Dashboard</h1>
+        <button
+          v-if="esAdmin"
+          type="button"
+          class="btn-menu-admin"
+          @click="irMenuAdmin"
+        >
+          Menú principal
+        </button>
+      </div>
       <p v-if="errorIncidentes" class="dash-error" role="alert">{{ errorIncidentes }}</p>
     </header>
 
@@ -135,6 +145,7 @@
 
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { useRouter } from 'vue-router'
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -164,6 +175,7 @@ import {
   LEYENDA_GRUPOS_EXCEL,
 } from '../utils/clasificacionExcelIncidentes.js'
 import { useCatalogoIncidentes } from '../composables/useCatalogoIncidentes.js'
+import { useAuth } from '../composables/useAuth'
 
 ChartJS.register(
   CategoryScale,
@@ -198,6 +210,10 @@ const COLOR_FILL = 'rgba(128, 0, 0, 0.2)'
 const COLOR_LINE = '#800000'
 const COLOR_BAR_MAIN = 'rgba(0, 51, 204, 0.85)'
 
+const router = useRouter()
+const { usuario } = useAuth()
+const esAdmin = computed(() => usuario.value?.rol === 'admin')
+
 const { leyendaCategorias: leyendaCatDash, leyendaMapa: leyendaMapaDash } = useCatalogoIncidentes()
 const categoriasOpciones = computed(() => {
   const L = leyendaCatDash.value
@@ -220,6 +236,10 @@ const filtroDia = ref(new Date().getDate())
 const filtroMes = ref(new Date().getMonth() + 1)
 const filtroAno = ref(añoSugeridoParaIncidentes())
 let pollingIncidentes = null
+
+function irMenuAdmin() {
+  router.push('/usuarios')
+}
 
 const anos = computed(() => {
   const list = []
@@ -653,6 +673,29 @@ onUnmounted(() => {
 
 .dashboard-head {
   margin-bottom: 1.25rem;
+}
+
+.dashboard-head-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.btn-menu-admin {
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  color: var(--color-secondary);
+  border-radius: var(--radius);
+  padding: 0.45rem 0.8rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.btn-menu-admin:hover {
+  background: #eef2ff;
 }
 
 .dashboard-sub {
