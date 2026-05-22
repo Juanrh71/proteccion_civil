@@ -22,6 +22,10 @@ npm-debug.log*
 .DS_Store
 Thumbs.db
 
+# Temporales (extracciones, pruebas)
+_tmp_pptx/
+_tmp_pptx.zip
+
 # IDE (opcional)
 .idea/
 *.swp

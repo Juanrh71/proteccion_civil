@@ -20,6 +20,8 @@ const MUNICIPIOS_CARABOBO = [
   'Miranda',
   'Montalbán',
   'Carlos Arvelo',
+  'San Joaquín',
+  'Los Guayos',
 ]
 const CARABOBO_BOUNDS = {
   minLat: 9.95,
@@ -132,7 +134,8 @@ function normalizarTexto(s) {
     .toLowerCase()
     .normalize('NFD')
     .replace(/\p{M}/gu, '')
-}
+    .replace(/^municipio\s+/, '') // <-- CORRECCIÓN: Elimina "municipio " al inicio si el GPS lo trae
+  }
 
 function municipioEsCarabobo(municipio) {
   const mNorm = normalizarTexto(municipio)
@@ -388,22 +391,35 @@ router.get('/mis-reportes/:id_usuario', async (req, res) => {
 
 router.get('/mapa-global', async (req, res) => {
   try {
+    // 1. Mantiene el auto-cierre por tiempo que ya habían programado
     await autoCerrarIncidentesLluviaPorTiempo()
+    
+    // 2. Query optimizada con JOINs para traer los colores hexadecimales de la BD
     const query = `
-      SELECT
-        id, tipo_nombre, categoria, lat, lng, estado, created_at
-      FROM incidentes
-      WHERE estado != 'cerrado'
-      ORDER BY created_at DESC`
+      SELECT 
+        i.id, 
+        i.tipo,
+        i.tipo_nombre, 
+        i.categoria, 
+        i.lat, 
+        i.lng, 
+        i.estado, 
+        i.created_at,
+        c.color AS color_categoria,
+        t.color AS color_tipo
+      FROM incidentes i
+      LEFT JOIN tipos_de_incidentes t ON i.tipo = t.slug
+      LEFT JOIN categorias_incidentes c ON t.id_categoria = c.id
+      WHERE i.estado != 'cerrado' 
+      ORDER BY i.created_at DESC`
 
     const [rows] = await pool.query(query)
     res.json(rows)
   } catch (err) {
-    console.error(err)
+    console.error(' Error al cargar mapa global:', err)
     res.status(500).json({ error: 'Error al cargar el mapa' })
   }
 })
-
 router.get('/', async (req, res) => {
   try {
     await autoCerrarIncidentesLluviaPorTiempo()

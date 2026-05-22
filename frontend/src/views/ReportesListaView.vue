@@ -30,6 +30,22 @@
       >
         Comparativa histórica
       </button>
+      <button
+        type="button"
+        class="menu-btn"
+        :class="{ activo: vistaReportes === 'indicadores' }"
+        @click="vistaReportes = 'indicadores'"
+      >
+        Indicadores de gestión
+      </button>
+      <button
+        type="button"
+        class="menu-btn"
+        :class="{ activo: vistaReportes === 'semanal' }"
+        @click="vistaReportes = 'semanal'"
+      >
+        Reporte semanal
+      </button>
     </section>
 
     <template v-if="vistaReportes === 'diarios'">
@@ -120,7 +136,7 @@
       </div>
     </template>
 
-    <template v-else>
+    <template v-else-if="vistaReportes === 'historico'">
       <section class="filtros-fecha card">
         <div class="filtros-row">
           <div class="form-group">
@@ -190,6 +206,267 @@
       </section>
     </template>
 
+    <ReporteSemanalPanel
+      v-else-if="vistaReportes === 'semanal'"
+      :incidentes="incidentes"
+      :logo-pdf-data-url="logoPdfDataUrl"
+    />
+
+    <template v-else-if="vistaReportes === 'indicadores'">
+      <section class="card filtros-indicadores">
+        <h2 class="ind-seccion-titulo">Filtros operativos</h2>
+        <div class="filtros-row">
+          <div class="form-group form-group--wide">
+            <label>Tipo de incidente</label>
+            <select v-model="indFiltroTipo" class="input">
+              <option v-for="t in tiposFiltroOpcionesInd" :key="t.id || 'todos'" :value="t.id">{{ t.nombre }}</option>
+            </select>
+          </div>
+          <div class="form-group form-group--wide">
+            <label>Calle / avenida</label>
+            <input v-model="indFiltroVia" type="text" class="input" placeholder="Buscar en vía…" />
+          </div>
+        </div>
+        <div class="filtros-row filtros-row--ubicacion">
+          <div class="form-group form-group--ubicacion">
+            <label>Municipio</label>
+            <div class="combo-multi">
+              <input
+                v-model="indMunicipioQuery"
+                type="text"
+                class="input"
+                placeholder="Buscar municipio…"
+                @focus="abrirMunicipiosInd = true"
+                @keydown.enter.prevent="agregarPrimerMunicipioInd"
+              />
+              <div v-if="abrirMunicipiosInd" class="combo-lista">
+                <button
+                  v-for="m in municipiosFiltradosInd"
+                  :key="m"
+                  type="button"
+                  class="combo-opcion"
+                  @mousedown.prevent="toggleMunicipioInd(m)"
+                >
+                  <span>{{ m }}</span>
+                  <span v-if="indFiltroMunicipios.includes(m)" class="combo-check">✓</span>
+                </button>
+              </div>
+            </div>
+            <div v-if="indFiltroMunicipios.length" class="chips-filtro">
+              <span v-for="m in indFiltroMunicipios" :key="m" class="chip">
+                {{ m }}
+                <button type="button" aria-label="Quitar" @click="toggleMunicipioInd(m)">×</button>
+              </span>
+            </div>
+          </div>
+          <div class="form-group form-group--ubicacion">
+            <label>Parroquia</label>
+            <div class="combo-multi">
+              <input
+                v-model="indParroquiaQuery"
+                type="text"
+                class="input"
+                placeholder="Seleccione municipio(s) primero…"
+                :disabled="!indFiltroMunicipios.length"
+                @focus="abrirParroquiasInd = true"
+                @keydown.enter.prevent="agregarPrimeraParroquiaInd"
+              />
+              <div v-if="abrirParroquiasInd && indFiltroMunicipios.length" class="combo-lista">
+                <button
+                  v-for="p in parroquiasFiltradasInd"
+                  :key="p"
+                  type="button"
+                  class="combo-opcion"
+                  @mousedown.prevent="toggleParroquiaInd(p)"
+                >
+                  <span>{{ p }}</span>
+                  <span v-if="indFiltroParroquias.includes(p)" class="combo-check">✓</span>
+                </button>
+              </div>
+            </div>
+            <div v-if="indFiltroParroquias.length" class="chips-filtro">
+              <span v-for="p in indFiltroParroquias" :key="p" class="chip">
+                {{ p }}
+                <button type="button" aria-label="Quitar" @click="toggleParroquiaInd(p)">×</button>
+              </span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card calendario-indicadores">
+        <h2 class="ind-seccion-titulo">Calendario y comparativa temporal</h2>
+        <div class="filtros-row">
+          <div class="form-group">
+            <label>Modo</label>
+            <select v-model="indModoComparacion" class="input">
+              <option value="mismo_anio">Mismo año (diario · mensual · trimestral · semestral · anual)</option>
+              <option value="entre_anios">Comparativa entre años</option>
+            </select>
+          </div>
+          <template v-if="indModoComparacion === 'mismo_anio'">
+            <div class="form-group">
+              <label>Año</label>
+              <select v-model.number="indAnioRef" class="input">
+                <option v-for="y in aniosDisponiblesComparativa" :key="`ind-y-${y}`" :value="y">{{ y }}</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Granularidad</label>
+              <select v-model="indGranularidad" class="input">
+                <option v-for="p in PERIODOS_MISMO_ANIO" :key="p.id" :value="p.id">{{ p.label }}</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Desde (mes)</label>
+              <select v-model.number="indMesDesde" class="input">
+                <option v-for="(mes, idx) in MESES" :key="`md-${idx}`" :value="idx + 1">{{ mes }}</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Hasta (mes)</label>
+              <select v-model.number="indMesHasta" class="input">
+                <option v-for="(mes, idx) in MESES" :key="`mh-${idx}`" :value="idx + 1">{{ mes }}</option>
+              </select>
+            </div>
+          </template>
+          <template v-else>
+            <div class="form-group">
+              <label>Año desde</label>
+              <select v-model.number="indAnioDesde" class="input">
+                <option v-for="y in aniosDisponiblesComparativa" :key="`yd-${y}`" :value="y">{{ y }}</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Año hasta</label>
+              <select v-model.number="indAnioHasta" class="input">
+                <option v-for="y in aniosDisponiblesComparativa" :key="`yh-${y}`" :value="y">{{ y }}</option>
+              </select>
+            </div>
+          </template>
+        </div>
+        <p class="filtro-resumen">{{ etiquetaResumenIndicadores }}</p>
+      </section>
+
+      <section class="kpi-grid">
+        <div class="kpi-card">
+          <span class="kpi-label">Total filtrado</span>
+          <strong class="kpi-valor">{{ resumenIndicadores.total }}</strong>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-label">Abiertos</span>
+          <strong class="kpi-valor kpi--abierto">{{ resumenIndicadores.abiertos }}</strong>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-label">En proceso</span>
+          <strong class="kpi-valor kpi--proceso">{{ resumenIndicadores.enProceso }}</strong>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-label">Cerrados</span>
+          <strong class="kpi-valor kpi--cerrado">{{ resumenIndicadores.cerrados }}</strong>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-label">Municipios</span>
+          <strong class="kpi-valor">{{ resumenIndicadores.municipios }}</strong>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-label">Parroquias</span>
+          <strong class="kpi-valor">{{ resumenIndicadores.parroquias }}</strong>
+        </div>
+      </section>
+
+      <section class="card comparativa-viz-card">
+        <h2 class="comparativa-viz-titulo">{{ tituloEvolucionInd }}</h2>
+        <p v-if="!chartEvolucionInd" class="comparativa-viz-hint">
+          No hay incidentes en el período seleccionado con los filtros actuales.
+        </p>
+        <div v-else class="comparativa-chart-box">
+          <Bar :data="chartEvolucionInd" :options="chartEvolucionOptions" />
+        </div>
+      </section>
+
+      <div class="ind-grid-dos">
+        <section class="card comparativa-viz-card">
+          <h2 class="comparativa-viz-titulo">Por categoría</h2>
+          <p v-if="!chartCategoriasInd" class="comparativa-viz-hint">Sin datos en el rango.</p>
+          <div v-else class="comparativa-chart-box comparativa-chart-box--med">
+            <Bar :data="chartCategoriasInd" :options="comparativaChartOptions" />
+          </div>
+        </section>
+        <section class="card comparativa-viz-card">
+          <h2 class="comparativa-viz-titulo">Top tipos de incidente</h2>
+          <p v-if="!chartTiposInd" class="comparativa-viz-hint">Sin datos en el rango.</p>
+          <div v-else class="comparativa-chart-box comparativa-chart-box--med">
+            <Bar :data="chartTiposInd" :options="comparativaChartOptions" />
+          </div>
+        </section>
+      </div>
+
+      <section class="card tabla-card">
+        <h2 class="comparativa-viz-titulo">Tabla · categorías y tipos</h2>
+        <div class="tabla-wrap">
+          <table class="tabla">
+            <thead>
+              <tr>
+                <th>Categoría</th>
+                <th>Tipo de incidente</th>
+                <th>Total</th>
+                <th>% del período</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-if="!tablaTiposInd.length">
+                <td colspan="4" class="lista-vacio-texto">Sin registros con los filtros actuales.</td>
+              </tr>
+              <tr v-for="(fila, idx) in tablaTiposInd" :key="`${fila.categoria}-${fila.tipo}-${idx}`">
+                <td>
+                  <span class="ind-cat-dot" :style="{ background: fila.color }" />
+                  {{ fila.categoria }}
+                </td>
+                <td>{{ fila.tipo }}</td>
+                <td>{{ fila.total }}</td>
+                <td>
+                  {{
+                    resumenIndicadores.total
+                      ? ((fila.total / resumenIndicadores.total) * 100).toFixed(1)
+                      : '0'
+                  }}%
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="card tabla-card">
+        <h2 class="comparativa-viz-titulo">Resumen por categoría</h2>
+        <div class="tabla-wrap">
+          <table class="tabla">
+            <thead>
+              <tr>
+                <th>Categoría</th>
+                <th>Incidentes</th>
+                <th>Tipos distintos</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-if="!tablaCategoriasInd.length">
+                <td colspan="3" class="lista-vacio-texto">Sin registros.</td>
+              </tr>
+              <tr v-for="c in tablaCategoriasInd" :key="c.id">
+                <td>
+                  <span class="ind-cat-dot" :style="{ background: c.color }" />
+                  {{ c.nombre }}
+                </td>
+                <td>{{ c.total }}</td>
+                <td>{{ c.tipos.length }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </template>
+
     <div
       v-if="mostrarModalVerResultado"
       class="modal-overlay"
@@ -248,6 +525,7 @@ import {
   Legend,
 } from 'chart.js'
 import { Bar } from 'vue-chartjs'
+import ReporteSemanalPanel from '../components/ReporteSemanalPanel.vue'
 import { obtenerIncidentes } from '../api/incidentes'
 import { descargarPdfTablaIncidentes } from '../utils/pdfTablaIncidentes.js'
 import {
@@ -258,10 +536,21 @@ import {
 } from '../utils/resultadoIncidente.js'
 import { descargarPdfComparativaHistorica } from '../utils/pdfComparativaHistorica.js'
 import { useAuth } from '../composables/useAuth'
+import { useCatalogoIncidentes } from '../composables/useCatalogoIncidentes.js'
+
+const PERIODOS_MISMO_ANIO = [
+  { id: 'diario', label: 'Diario' },
+  { id: 'mensual', label: 'Mensual' },
+  { id: 'trimestral', label: 'Trimestral' },
+  { id: 'semestral', label: 'Semestral' },
+  { id: 'anual', label: 'Anual' },
+]
 import {
   RANGO_ANO_INICIO,
   RANGO_ANO_FIN,
   añoSugeridoParaIncidentes,
+  MUNICIPIOS_CARABOBO,
+  PARROQUIAS_POR_MUNICIPIO,
 } from '../config/incidentes'
 import {
   colorGrupoExcel,
@@ -274,6 +563,26 @@ ChartJS.register(CategoryScale, LinearScale, BarElement, BarController, Tooltip,
 const router = useRouter()
 const { usuario } = useAuth()
 const esAdmin = computed(() => usuario.value?.rol === 'admin')
+const { tiposPlano, cargarCatalogoIncidentes } = useCatalogoIncidentes()
+
+// Filtros indicadores (mismo criterio que Incidentes)
+const indFiltroTipo = ref('')
+const indFiltroMunicipios = ref([])
+const indFiltroParroquias = ref([])
+const indFiltroVia = ref('')
+const indMunicipioQuery = ref('')
+const indParroquiaQuery = ref('')
+const abrirMunicipiosInd = ref(false)
+const abrirParroquiasInd = ref(false)
+
+// Modo comparación temporal
+const indModoComparacion = ref('mismo_anio') // mismo_anio | entre_anios
+const indGranularidad = ref('mensual')
+const indAnioRef = ref(añoSugeridoParaIncidentes())
+const indAnioDesde = ref(añoSugeridoParaIncidentes())
+const indAnioHasta = ref(añoSugeridoParaIncidentes())
+const indMesDesde = ref(1)
+const indMesHasta = ref(12)
 
 const MESES = [
   'Enero',
@@ -400,6 +709,368 @@ function formatearFecha(fecha) {
 
 function irMenuAdmin() {
   router.push('/usuarios')
+}
+
+function normalizarBusqueda(s) {
+  return String(s || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim()
+}
+
+function incidentePasaFiltrosInd(inc) {
+  if (indFiltroTipo.value) {
+    const tipoSlug = String(inc?.tipo || '').trim()
+    if (!tipoSlug || tipoSlug !== indFiltroTipo.value) return false
+  }
+  if (indFiltroMunicipios.value.length > 0) {
+    const m = String(inc?.municipio || '').trim()
+    if (!m || !indFiltroMunicipios.value.includes(m)) return false
+  }
+  if (indFiltroParroquias.value.length > 0) {
+    const p = String(inc?.parroquia || '').trim()
+    if (!p || !indFiltroParroquias.value.includes(p)) return false
+  }
+  if (indFiltroVia.value.trim()) {
+    const via = String(inc?.via || '').toLowerCase()
+    const q = normalizarBusqueda(indFiltroVia.value)
+    if (!via.includes(q)) return false
+  }
+  return true
+}
+
+function getRangoIndicadores() {
+  const hoy = new Date()
+  if (indModoComparacion.value === 'entre_anios') {
+    const y1 = Math.min(indAnioDesde.value, indAnioHasta.value)
+    const y2 = Math.max(indAnioDesde.value, indAnioHasta.value)
+    return { inicio: new Date(y1, 0, 1), fin: new Date(y2, 11, 30, 23, 59, 59) }
+  }
+  const y = indAnioRef.value
+  const m1 = indMesDesde.value
+  const m2 = indMesHasta.value
+  return {
+    inicio: new Date(y, m1 - 1, 1),
+    fin: new Date(y, m2, 0, 23, 59, 59, 999),
+  }
+}
+
+function periodoKey(d, granularidad) {
+  const y = d.getFullYear()
+  const m = d.getMonth() + 1
+  if (granularidad === 'diario') {
+    const day = String(d.getDate()).padStart(2, '0')
+    return `${y}-${String(m).padStart(2, '0')}-${day}`
+  }
+  if (granularidad === 'mensual') return `${y}-${String(m).padStart(2, '0')}`
+  if (granularidad === 'trimestral') {
+    const q = Math.ceil(m / 3)
+    return `${y}-Q${q}`
+  }
+  if (granularidad === 'semestral') {
+    return `${y}-S${d.getMonth() < 6 ? 1 : 2}`
+  }
+  return String(y)
+}
+
+function etiquetaPeriodo(key, granularidad, modoEntreAnios) {
+  if (modoEntreAnios) return key
+  if (granularidad === 'diario') {
+    const [y, m, d] = key.split('-')
+    return `${d}/${m}/${y}`
+  }
+  if (granularidad === 'mensual') {
+    const [y, m] = key.split('-')
+    return `${MESES[Number(m) - 1] || m} ${y}`
+  }
+  if (granularidad === 'trimestral') {
+    const [y, q] = key.split('-')
+    return `${q} ${y}`
+  }
+  if (granularidad === 'semestral') {
+    const [y, s] = key.split('-')
+    return s === 'S1' ? `1.er semestre ${y}` : `2.º semestre ${y}`
+  }
+  return key
+}
+
+function ordenarClavesPeriodo(keys, granularidad, modoEntreAnios) {
+  if (modoEntreAnios) return keys.sort((a, b) => Number(a) - Number(b))
+  return keys.sort((a, b) => a.localeCompare(b))
+}
+
+function agruparPeriodos(listaInc, granularidad, rango, modoEntreAnios) {
+  const map = new Map()
+  for (const inc of listaInc) {
+    const d = parseFechaInc(inc)
+    if (!d) continue
+    if (d < rango.inicio || d > rango.fin) continue
+    const key = modoEntreAnios ? String(d.getFullYear()) : periodoKey(d, granularidad)
+    map.set(key, (map.get(key) || 0) + 1)
+  }
+  const keys = ordenarClavesPeriodo(Array.from(map.keys()), granularidad, modoEntreAnios)
+  return {
+    labels: keys.map((k) => etiquetaPeriodo(k, granularidad, modoEntreAnios)),
+    values: keys.map((k) => map.get(k) || 0),
+    total: keys.reduce((s, k) => s + (map.get(k) || 0), 0),
+  }
+}
+
+function agruparCategoriasTipos(listaInc) {
+  const catMap = new Map()
+  for (const inc of listaInc) {
+    const d = parseFechaInc(inc)
+    if (!d) continue
+    const cat = grupoExcelDeIncidente(inc)
+    const tipoSlug = String(inc?.tipo || '').trim() || 'sin_tipo'
+    const tipoNombre = nombreTipoBase(inc)
+    if (!catMap.has(cat)) {
+      catMap.set(cat, {
+        id: cat,
+        nombre: nombreGrupoExcel(inc),
+        color: colorGrupoExcel(inc),
+        total: 0,
+        tipos: new Map(),
+      })
+    }
+    const catEntry = catMap.get(cat)
+    catEntry.total += 1
+    if (!catEntry.tipos.has(tipoSlug)) {
+      catEntry.tipos.set(tipoSlug, { nombre: tipoNombre, total: 0 })
+    }
+    const t = catEntry.tipos.get(tipoSlug)
+    t.total += 1
+  }
+  const categorias = Array.from(catMap.values())
+    .map((c) => ({
+      ...c,
+      tipos: Array.from(c.tipos.entries())
+        .map(([slug, t]) => ({
+          slug,
+          nombre: t.nombre,
+          total: t.total,
+        }))
+        .sort((a, b) => b.total - a.total),
+    }))
+    .sort((a, b) => b.total - a.total)
+  const filasTipo = []
+  for (const c of categorias) {
+    for (const t of c.tipos) {
+      filasTipo.push({ categoria: c.nombre, tipo: t.nombre, total: t.total, color: c.color })
+    }
+  }
+  filasTipo.sort((a, b) => b.total - a.total)
+  return { categorias, filasTipo }
+}
+
+const incidentesIndicadoresBase = computed(() => {
+  return incidentes.value.filter(incidentePasaFiltrosInd)
+})
+
+const incidentesIndicadoresEnRango = computed(() => {
+  const rango = getRangoIndicadores()
+  return incidentesIndicadoresBase.value.filter((inc) => {
+    const d = parseFechaInc(inc)
+    return d && d >= rango.inicio && d <= rango.fin
+  })
+})
+
+const resumenIndicadores = computed(() => {
+  const list = incidentesIndicadoresEnRango.value
+  const abiertos = list.filter((i) => i.estado === 'abierto' || (i.cerrado !== true && i.estado !== 'cerrado')).length
+  const enProceso = list.filter((i) => i.estado === 'en_proceso').length
+  const cerrados = list.filter((i) => i.cerrado === true || i.estado === 'cerrado').length
+  return {
+    total: list.length,
+    abiertos,
+    enProceso,
+    cerrados,
+    municipios: new Set(list.map((i) => i.municipio).filter(Boolean)).size,
+    parroquias: new Set(list.map((i) => i.parroquia).filter(Boolean)).size,
+  }
+})
+
+const tiposFiltroOpcionesInd = computed(() => {
+  const out = [{ id: '', nombre: 'Todos los tipos' }]
+  for (const t of tiposPlano.value) {
+    out.push({ id: t.id, nombre: t.nombre })
+  }
+  return out.sort((a, b) => a.nombre.localeCompare(b.nombre))
+})
+
+const municipiosFiltradosInd = computed(() => {
+  const q = normalizarBusqueda(indMunicipioQuery.value)
+  if (!q) return [...MUNICIPIOS_CARABOBO]
+  return MUNICIPIOS_CARABOBO.filter((m) => normalizarBusqueda(m).includes(q))
+})
+
+const parroquiasOpcionesInd = computed(() => {
+  const set = new Set()
+  for (const m of indFiltroMunicipios.value) {
+    const list = PARROQUIAS_POR_MUNICIPIO[m] || []
+    for (const p of list) set.add(p)
+  }
+  return Array.from(set).sort((a, b) => a.localeCompare(b))
+})
+
+const parroquiasFiltradasInd = computed(() => {
+  const q = normalizarBusqueda(indParroquiaQuery.value)
+  if (!q) return parroquiasOpcionesInd.value
+  return parroquiasOpcionesInd.value.filter((p) => normalizarBusqueda(p).includes(q))
+})
+
+function toggleMunicipioInd(m) {
+  if (indFiltroMunicipios.value.includes(m)) {
+    indFiltroMunicipios.value = indFiltroMunicipios.value.filter((x) => x !== m)
+  } else {
+    indFiltroMunicipios.value = [...indFiltroMunicipios.value, m].sort()
+  }
+  const validas = new Set()
+  for (const mun of indFiltroMunicipios.value) {
+    for (const p of PARROQUIAS_POR_MUNICIPIO[mun] || []) validas.add(p)
+  }
+  indFiltroParroquias.value = indFiltroParroquias.value.filter((p) => validas.has(p))
+}
+
+function toggleParroquiaInd(p) {
+  if (indFiltroParroquias.value.includes(p)) {
+    indFiltroParroquias.value = indFiltroParroquias.value.filter((x) => x !== p)
+  } else {
+    indFiltroParroquias.value = [...indFiltroParroquias.value, p]
+  }
+}
+
+function agregarPrimerMunicipioInd() {
+  const m = municipiosFiltradosInd.value[0]
+  if (m && !indFiltroMunicipios.value.includes(m)) toggleMunicipioInd(m)
+}
+
+function agregarPrimeraParroquiaInd() {
+  const p = parroquiasFiltradasInd.value[0]
+  if (p && !indFiltroParroquias.value.includes(p)) toggleParroquiaInd(p)
+}
+
+const etiquetaResumenIndicadores = computed(() => {
+  const parts = []
+  if (indFiltroTipo.value) {
+    const t = tiposFiltroOpcionesInd.value.find((x) => x.id === indFiltroTipo.value)
+    if (t) parts.push(`Tipo: ${t.nombre}`)
+  }
+  if (indFiltroMunicipios.value.length) {
+    parts.push(`Municipios: ${indFiltroMunicipios.value.join(', ')}`)
+  }
+  if (indFiltroParroquias.value.length) {
+    parts.push(`Parroquias: ${indFiltroParroquias.value.join(', ')}`)
+  }
+  if (indFiltroVia.value.trim()) {
+    parts.push(`Vía: "${indFiltroVia.value}"`)
+  }
+  if (indModoComparacion.value === 'entre_anios') {
+    parts.push(`Comparativa entre años ${indAnioDesde.value} – ${indAnioHasta.value}`)
+  } else {
+    const g = PERIODOS_MISMO_ANIO.find((p) => p.id === indGranularidad.value)
+    parts.push(
+      `${g?.label || 'Período'} ${indAnioRef.value} · ${MESES[indMesDesde.value - 1]} – ${MESES[indMesHasta.value - 1]}`
+    )
+  }
+  parts.push(`${incidentesIndicadoresEnRango.value.length} incidente(s) en el rango`)
+  return parts.join(' · ')
+})
+
+const chartEvolucionInd = computed(() => {
+  const rango = getRangoIndicadores()
+  const entreAnios = indModoComparacion.value === 'entre_anios'
+  const { labels, values } = agruparPeriodos(
+    incidentesIndicadoresBase.value,
+    indGranularidad.value,
+    rango,
+    entreAnios
+  )
+  if (!labels.length) return null
+  return {
+    labels,
+    datasets: [
+      {
+        label: 'Incidentes',
+        data: values,
+        backgroundColor: 'rgba(0, 51, 204, 0.85)',
+        borderRadius: 6,
+      },
+    ],
+  }
+})
+
+const tituloEvolucionInd = computed(() => {
+  if (indModoComparacion.value === 'entre_anios') {
+    return `Comparativa entre años (${indAnioDesde.value} – ${indAnioHasta.value})`
+  }
+  const g = PERIODOS_MISMO_ANIO.find((p) => p.id === indGranularidad.value)
+  return `Evolución ${g?.label?.toLowerCase() || ''} · año ${indAnioRef.value}`
+})
+
+const chartCategoriasInd = computed(() => {
+  const { categorias } = agruparCategoriasTipos(incidentesIndicadoresEnRango.value)
+  if (!categorias.length) return null
+  return {
+    labels: categorias.map((c) => c.nombre),
+    datasets: [
+      {
+        label: 'Incidentes',
+        data: categorias.map((c) => c.total),
+        backgroundColor: categorias.map((c) => c.color),
+        borderRadius: 6,
+      },
+    ],
+  }
+})
+
+const chartTiposInd = computed(() => {
+  const { filasTipo } = agruparCategoriasTipos(incidentesIndicadoresEnRango.value)
+  const top = filasTipo.slice(0, 12)
+  if (!top.length) return null
+  return {
+    labels: top.map((t) => t.tipo),
+    datasets: [
+      {
+        label: 'Incidentes',
+        data: top.map((t) => t.total),
+        backgroundColor: 'rgba(100, 116, 139, 0.75)',
+      },
+    ],
+  }
+})
+
+const tablaCategoriasInd = computed(() => {
+  return agruparCategoriasTipos(incidentesIndicadoresEnRango.value).categorias
+})
+
+const tablaTiposInd = computed(() => {
+  return agruparCategoriasTipos(incidentesIndicadoresEnRango.value).filasTipo
+})
+
+watch(indModoComparacion, (modo) => {
+  if (modo === 'entre_anios') return
+  if (indAnioDesde.value > indAnioHasta.value) {
+    indAnioHasta.value = indAnioDesde.value
+  }
+})
+
+watch([indMesDesde, indMesHasta], () => {
+  if (indMesDesde.value > indMesHasta.value) indMesHasta.value = indMesDesde.value
+})
+
+const chartEvolucionOptions = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: {
+    legend: { display: true, position: 'top' },
+    tooltip: { mode: 'index', intersect: false },
+  },
+  scales: {
+    x: { grid: { color: 'rgba(226, 232, 240, 0.9)' } },
+    y: { beginAtZero: true, ticks: { precision: 0 } },
+  },
 }
 
 function textoEstadoListado(inc) {
@@ -677,6 +1348,7 @@ function descargarPdfHistorico() {
 
 onMounted(async () => {
   try {
+    await cargarCatalogoIncidentes()
     incidentes.value = await obtenerIncidentes()
     errorCarga.value = ''
   } catch (e) {
@@ -1095,5 +1767,150 @@ onMounted(async () => {
 .celda-sin-resultado {
   color: var(--color-text-muted, #94a3b8);
   font-size: 0.9rem;
+}
+
+.ind-seccion-titulo {
+  margin: 0 0 0.35rem;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--color-secondary);
+}
+
+.form-group--wide {
+  flex: 1 1 220px;
+  min-width: 200px;
+}
+
+.form-group--ubicacion {
+  flex: 1 1 280px;
+  min-width: 240px;
+}
+
+.filtros-row--ubicacion {
+  margin-top: 0.5rem;
+}
+
+.combo-multi {
+  position: relative;
+}
+
+.combo-lista {
+  position: absolute;
+  z-index: 20;
+  left: 0;
+  right: 0;
+  top: calc(100% + 4px);
+  max-height: 200px;
+  overflow-y: auto;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+}
+
+.combo-opcion {
+  display: flex;
+  width: 100%;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.45rem 0.65rem;
+  border: none;
+  background: transparent;
+  text-align: left;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.combo-opcion:hover {
+  background: #f1f5f9;
+}
+
+.combo-check {
+  color: #0033cc;
+  font-weight: 700;
+}
+
+.chips-filtro {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.45rem;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.2rem 0.45rem;
+  background: #eef4ff;
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+  font-size: 0.8rem;
+}
+
+.chip button {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1;
+  color: #64748b;
+}
+
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+
+.kpi-card {
+  background: var(--color-surface-card, #fff);
+  border: 1px solid rgba(226, 232, 240, 0.85);
+  border-radius: var(--radius-lg);
+  padding: 0.85rem 1rem;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+}
+
+.kpi-label {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-muted);
+  margin-bottom: 0.25rem;
+}
+
+.kpi-valor {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--color-secondary);
+}
+
+.kpi--abierto { color: #b91c1c; }
+.kpi--proceso { color: #c2410c; }
+.kpi--cerrado { color: #475569; }
+
+.ind-grid-dos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.comparativa-chart-box--med {
+  height: min(280px, 55vh);
+  min-height: 180px;
+}
+
+.ind-cat-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-right: 0.35rem;
+  vertical-align: middle;
+  border: 1px solid rgba(15, 23, 42, 0.2);
 }
 </style>
