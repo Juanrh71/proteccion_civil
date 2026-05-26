@@ -8,6 +8,7 @@ const COLUMNAS_TABLA = [
   'Municipio',
   'Parroquia',
   'Calle / Avenida',
+  'Procedencia',
   'Estado',
   'Resultado',
 ]

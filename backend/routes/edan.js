@@ -66,11 +66,15 @@ const SQL_UPDATE_EDAN = `
   WHERE id = ?
 `
 
-/** Compat: body de la app puede usar `lact_Fem` o `lact.Fem` */
-function pick(d, a, b) {
-  if (d[a] != null && d[a] !== '') return d[a]
-  if (b != null && d[b] != null && d[b] !== '') return d[b]
-  return d[a] ?? d[b] ?? null
+/** Compat: body de la app puede usar `lact_Fem`, `lact.Fem`, `niños_Fem`, etc. */
+function pick(d, ...keys) {
+  for (const k of keys) {
+    if (k != null && d[k] != null && d[k] !== '') return d[k]
+  }
+  for (const k of keys) {
+    if (k != null && d[k] != null) return d[k]
+  }
+  return null
 }
 
 function normalizarTexto(s) {
@@ -84,7 +88,15 @@ function normalizarTexto(s) {
 function municipioDeCarabobo(municipio) {
   const mNorm = normalizarTexto(municipio)
   if (!mNorm) return ''
-  return MUNICIPIOS_CARABOBO.find((m) => normalizarTexto(m) === mNorm) || ''
+  const exacto = MUNICIPIOS_CARABOBO.find((m) => normalizarTexto(m) === mNorm)
+  if (exacto) return exacto
+  // Nominatim suele devolver "Municipio Valencia", etc.
+  return (
+    MUNICIPIOS_CARABOBO.find((m) => {
+      const canon = normalizarTexto(m)
+      return mNorm.includes(canon) || canon.includes(mNorm)
+    }) || ''
+  )
 }
 
 function textoRequerido(v, campo, maxLen = 255) {
@@ -220,8 +232,8 @@ function validarYNormalizarPayload(d, { requiereIdOficial }) {
     descripcion_vivienda: textoRequerido(d?.descripcion_vivienda, 'descripcion_vivienda', 4000),
     lact_Fem: enteroNoNegativo(pick(d, 'lact.Fem', 'lact_Fem') ?? 0, 'lact_Fem'),
     lact_Masc: enteroNoNegativo(pick(d, 'lact.Masc', 'lact_Masc') ?? 0, 'lact_Masc'),
-    ninos_Fem: enteroNoNegativo(pick(d, 'niños.Fem', 'ninos_Fem') ?? 0, 'ninos_Fem'),
-    ninos_Masc: enteroNoNegativo(pick(d, 'niños.Masc', 'ninos_Masc') ?? 0, 'ninos_Masc'),
+    ninos_Fem: enteroNoNegativo(pick(d, 'niños.Fem', 'ninos_Fem', 'niños_Fem') ?? 0, 'ninos_Fem'),
+    ninos_Masc: enteroNoNegativo(pick(d, 'niños.Masc', 'ninos_Masc', 'niños_Masc') ?? 0, 'ninos_Masc'),
     adultos_Fem: enteroNoNegativo(pick(d, 'adultos.Fem', 'adultos_Fem') ?? 0, 'adultos_Fem'),
     adultos_Masc: enteroNoNegativo(pick(d, 'adultos.Masc', 'adultos_Masc') ?? 0, 'adultos_Masc'),
     tercera_edad_Fem: enteroNoNegativo(

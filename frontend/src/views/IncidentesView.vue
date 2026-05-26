@@ -178,6 +178,7 @@
               <th>Municipio</th>
               <th>Parroquia</th>
               <th>Calle / Avenida</th>
+              <th>Procedencia</th>
               <th>Estado</th>
               <th v-if="vistaLista === 'cerrados'" class="th-resultado">Resultado</th>
               <th class="th-acc">Acc.</th>
@@ -191,6 +192,7 @@
               <td>{{ inc.municipio || '—' }}</td>
               <td>{{ inc.parroquia || '—' }}</td>
               <td>{{ inc.via || '—' }}</td>
+              <td>{{ inc.procedencia === 'movil' ? 'Móvil' : '' }}</td>
               <td>
                 <span v-if="textoEstadoListado(inc) === 'Cerrado'" class="badge-estado badge-cerrado">Cerrado</span>
                 <span v-else-if="textoEstadoListado(inc) === 'En proceso'" class="badge-estado badge-proceso">En proceso</span>
@@ -639,6 +641,8 @@ const incidenteVerResultado = ref(null)
 const ahoraMs = ref(Date.now())
 const listaFetchMs = ref(Date.now())
 let relojEdicion = null
+let refrescarIncidentesTimer = null
+let refrescarIncidentesEnProgreso = false
 let secuenciaReverseMunicipio = 0
 const edanLista = ref([])
 const filtroPlanillaEdan = ref('')
@@ -876,6 +880,7 @@ function descargarPdf() {
       inc.municipio || '—',
       inc.parroquia || '—',
       inc.via || '—',
+      inc.procedencia === 'movil' ? 'Móvil' : '',
       textoEstadoListado(inc),
       etiquetaResultadoPdf(inc),
     ])
@@ -1171,6 +1176,19 @@ async function guardarEdicion() {
   guardando.value = false
 }
 
+async function refrescarIncidentes() {
+  if (refrescarIncidentesEnProgreso) return
+  refrescarIncidentesEnProgreso = true
+  try {
+    aplicarListaIncidentesDesdeApi(await obtenerIncidentes())
+    errorCargaLista.value = ''
+  } catch (e) {
+    errorCargaLista.value = e?.message || 'No se pudo actualizar el listado.'
+  } finally {
+    refrescarIncidentesEnProgreso = false
+  }
+}
+
 function aplicarListaIncidentesDesdeApi(data) {
   incidentes.value = Array.isArray(data) ? data : []
   listaFetchMs.value = Date.now()
@@ -1188,12 +1206,17 @@ onMounted(async () => {
   relojEdicion = setInterval(() => {
     ahoraMs.value = Date.now()
   }, 1000)
+  refrescarIncidentesTimer = setInterval(refrescarIncidentes, 10000)
 })
 
 onUnmounted(() => {
   if (relojEdicion != null) {
     clearInterval(relojEdicion)
     relojEdicion = null
+  }
+  if (refrescarIncidentesTimer != null) {
+    clearInterval(refrescarIncidentesTimer)
+    refrescarIncidentesTimer = null
   }
 })
 </script>
