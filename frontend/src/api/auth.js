@@ -71,3 +71,14 @@ export async function login(correo, password) {
 export function logout() {
   clearAuth()
 }
+
+export async function solicitarCodigoRecuperacion(correo) {
+  const { data } = await api.post('/api/auth/solicitar-codigo', { correo })
+  return data
+}
+
+export async function cambiarPasswordConCodigo(correo, codigo, password) {
+  const { data } = await api.post('/api/auth/cambiar-password', { correo, codigo, password })
+  return data
+}
+

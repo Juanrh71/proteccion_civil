@@ -265,6 +265,20 @@ export async function ensureIncidentesSchema() {
       )
     }
 
+    if (!(await hasColumn(dbName, 'usuarios', 'codigo_recuperacion'))) {
+      await pool.query(
+        "ALTER TABLE usuarios ADD COLUMN codigo_recuperacion VARCHAR(10) DEFAULT NULL AFTER estatus"
+      )
+      console.log('[db] Columna usuarios.codigo_recuperacion creada.')
+    }
+
+    if (!(await hasColumn(dbName, 'usuarios', 'expiracion_codigo'))) {
+      await pool.query(
+        "ALTER TABLE usuarios ADD COLUMN expiracion_codigo DATETIME DEFAULT NULL AFTER codigo_recuperacion"
+      )
+      console.log('[db] Columna usuarios.expiracion_codigo creada.')
+    }
+
     if (!(await hasTable(dbName, 'incidentes'))) {
       await pool.query(
         `CREATE TABLE incidentes (

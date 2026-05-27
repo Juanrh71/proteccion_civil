@@ -378,6 +378,35 @@
             </p>
             <p v-else-if="cargandoUsuarios" class="msg msg-muted msg-left admin-loading">Cargando usuarios&hellip;</p>
             <div v-else class="tabla-wrap">
+              <!-- Sub-panel para Restablecer Contraseña con Código -->
+              <div v-if="restablecerCorreo" class="admin-catalogo-block" style="margin-bottom: 1.5rem; border: 2px solid var(--color-accent); padding: 1rem; border-radius: var(--radius-lg); background-color: var(--color-white);">
+                <p class="admin-section-label" style="color: var(--color-accent); margin-top: 0;">Restablecer contraseña para: <strong>{{ restablecerCorreo }}</strong></p>
+                <p style="font-size: 0.85rem; margin-bottom: 0.75rem; color: var(--color-text-muted);">
+                  Se ha enviado un correo con el código de 6 dígitos al oficial. Ingrese el código recibido y la nueva contraseña aquí abajo.
+                </p>
+                <div class="admin-catalogo-form-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)) gap 1rem; align-items: flex-end;">
+                  <div class="form-group form-group-small" style="margin-bottom: 0;">
+                    <label>Código de 6 dígitos</label>
+                    <input v-model="restablecerForm.codigo" type="text" class="input input-small" placeholder="Ej: 123456" maxlength="6" />
+                  </div>
+                  <div class="form-group form-group-small" style="margin-bottom: 0;">
+                    <label>Nueva Contraseña</label>
+                    <input v-model="restablecerForm.password" type="password" class="input input-small" placeholder="Mínimo 6 caracteres" />
+                  </div>
+                  <div style="display: flex; gap: 0.5rem; margin-top: 1rem;">
+                    <button type="button" class="btn btn-primary admin-btn-primary btn-small" :disabled="procesandoRestablecer" @click="confirmarRestablecerClave">
+                      {{ procesandoRestablecer ? 'Guardando...' : 'Aplicar cambio' }}
+                    </button>
+                    <button type="button" class="btn btn-secondary btn-small" style="background-color: #64748b;" @click="cancelarRestablecer">
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+                <p v-if="restablecerMsg" :class="['msg', restablecerMsgOk ? 'ok' : 'error']" style="margin-top: 0.5rem; font-size: 0.9rem; text-align: left;">
+                  {{ restablecerMsg }}
+                </p>
+              </div>
+
               <table class="tabla-usuarios">
                 <thead>
                   <tr>
@@ -402,7 +431,7 @@
                       <span v-else-if="u.rol === 'oficial'" class="rol-tag rol-tag--oficial">oficial</span>
                       <span v-else class="rol-tag rol-tag--civil">civil</span>
                     </td>
-                    <td class="td-acc">
+                    <td class="td-acc" style="display: flex; gap: 0.5rem; justify-content: flex-start; align-items: center; min-height: 48px;">
                       <button
                         v-if="puedeBloquear(u)"
                         type="button"
@@ -421,7 +450,19 @@
                       >
                         {{ procesandoId === u.id ? '...' : 'Desbloquear' }}
                       </button>
-                      <span v-else class="td-acc-na" title="No aplica">—</span>
+                      <span v-else class="td-acc-na" title="No aplica" style="display: inline-block; width: 60px; text-align: center;">—</span>
+
+                      <!-- Botón para Restablecer Clave (sólo oficiales y otros admins, no para ciudadanos o a sí mismo si no lo requiere) -->
+                      <button
+                        v-if="u.rol !== 'ciudadano'"
+                        type="button"
+                        class="btn btn-acc"
+                        style="background: linear-gradient(180deg, var(--color-orange), var(--color-orange-dark)); color: white; border-color: var(--color-orange-dark); box-shadow: 0 1px 4px rgba(255, 128, 0, 0.35);"
+                        :disabled="procesandoId === u.id || restablecerCorreo === u.correo"
+                        @click="iniciarRestablecerClave(u)"
+                      >
+                        {{ procesandoId === u.id && restablecerCorreo === u.correo ? 'Enviando...' : 'Restablecer Clave' }}
+                      </button>
                     </td>
                   </tr>
                 </tbody>
@@ -599,8 +640,19 @@ const mensajeGlobal = ref('')
 const mensajeOk = ref(false)
 const enviando = ref(false)
 
+// Estados para Restablecer Clave (Administrador)
+const restablecerCorreo = ref('')
+const restablecerForm = ref({
+  codigo: '',
+  password: ''
+})
+const restablecerMsg = ref('')
+const restablecerMsgOk = ref(false)
+const procesandoRestablecer = ref(false)
+
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const soloDigitos = /^\d+$/
+
 
 function abrirPanel(panel) {
   panelAdmin.value = panel
@@ -812,6 +864,78 @@ async function toggleBloqueo(u, estatus) {
     procesandoId.value = null
   }
 }
+
+// FUNCIONES DE RESTABLECIMIENTO DE CLAVE DESDE VUE (ADMIN)
+import { solicitarCodigoRecuperacion, cambiarPasswordConCodigo } from '../api/auth'
+
+async function iniciarRestablecerClave(u) {
+  if (!window.confirm(`¿Enviar código de verificación al correo de ${u.nombre} ${u.apellido} (${u.correo}) para cambiar su clave?`)) return
+  procesandoId.value = u.id
+  restablecerMsg.value = ''
+  restablecerMsgOk.value = false
+  try {
+    const res = await solicitarCodigoRecuperacion(u.correo)
+    restablecerCorreo.value = u.correo
+    restablecerForm.value.codigo = ''
+    restablecerForm.value.password = ''
+    restablecerMsg.value = res.message || 'Código enviado con éxito.'
+    restablecerMsgOk.value = true
+  } catch (e) {
+    let msg = 'No se pudo enviar el código.'
+    if (e.response && e.response.data && e.response.data.error) {
+      msg = e.response.data.error
+    }
+    restablecerMsg.value = msg
+    restablecerMsgOk.value = false
+    restablecerCorreo.value = ''
+  } finally {
+    procesandoId.value = null
+  }
+}
+
+async function confirmarRestablecerClave() {
+  const f = restablecerForm.value
+  if (!f.codigo.trim() || f.codigo.trim().length !== 6) {
+    restablecerMsg.value = 'El código debe tener exactamente 6 dígitos.'
+    restablecerMsgOk.value = false
+    return
+  }
+  if (!f.password || f.password.length < 6) {
+    restablecerMsg.value = 'La nueva contraseña debe tener al menos 6 caracteres.'
+    restablecerMsgOk.value = false
+    return
+  }
+
+  procesandoRestablecer.value = true
+  restablecerMsg.value = ''
+  restablecerMsgOk.value = false
+  try {
+    const res = await cambiarPasswordConCodigo(restablecerCorreo.value, f.codigo, f.password)
+    restablecerMsg.value = res.message || 'Contraseña actualizada con éxito.'
+    restablecerMsgOk.value = true
+    setTimeout(() => {
+      cancelarRestablecer()
+    }, 3000)
+  } catch (e) {
+    let msg = 'No se pudo restablecer la contraseña.'
+    if (e.response && e.response.data && e.response.data.error) {
+      msg = e.response.data.error
+    }
+    restablecerMsg.value = msg
+    restablecerMsgOk.value = false
+  } finally {
+    procesandoRestablecer.value = false
+  }
+}
+
+function cancelarRestablecer() {
+  restablecerCorreo.value = ''
+  restablecerForm.value.codigo = ''
+  restablecerForm.value.password = ''
+  restablecerMsg.value = ''
+  restablecerMsgOk.value = false
+}
+
 
 watch(filtroEstatus, () => {
   if (esModoAdmin && panelAdmin.value === 'activos') {

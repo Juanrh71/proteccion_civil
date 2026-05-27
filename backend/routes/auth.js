@@ -395,4 +395,144 @@ router.put('/change-password', verifyToken, async (req, res) => {
   }
 })
 
+// CONFIGURACIÓN DE NODEMAILER PARA RECUPERACIÓN DE CONTRASEÑA
+import nodemailer from 'nodemailer'
+
+const getMailTransporter = () => {
+  const host = process.env.SMTP_HOST || 'smtp.gmail.com'
+  const port = parseInt(process.env.SMTP_PORT || '465', 10)
+  const user = process.env.SMTP_USER || 'prueba1@gmail.com'
+  const pass = process.env.SMTP_PASS || ''
+  const secure = process.env.SMTP_SECURE === 'false' ? false : true
+
+  return nodemailer.createTransport({
+    host,
+    port,
+    secure,
+    auth: {
+      user,
+      pass
+    }
+  })
+}
+
+// 1. SOLICITAR CÓDIGO DE RECUPERACIÓN
+router.post('/solicitar-codigo', async (req, res) => {
+  try {
+    const { correo } = req.body
+    if (!correo) {
+      return res.status(400).json({ error: 'El correo electrónico es requerido.' })
+    }
+    const correoNorm = correo.toString().trim().toLowerCase()
+    if (!emailRegex.test(correoNorm)) {
+      return res.status(400).json({ error: 'El correo electrónico no tiene un formato válido.' })
+    }
+
+    // Buscar si existe el usuario
+    const [usuarios] = await pool.query('SELECT id, nombre, apellido FROM usuarios WHERE correo = ?', [correoNorm])
+    if (usuarios.length === 0) {
+      // Por seguridad, para evitar enumeración de usuarios, devolvemos un mensaje genérico de éxito,
+      // pero en este caso de Protección Civil podemos ser más directos.
+      return res.status(404).json({ error: 'No existe ningún usuario registrado con ese correo.' })
+    }
+
+    const usuario = usuarios[0]
+    // Generar código numérico aleatorio de 6 dígitos
+    const codigo = Math.floor(100000 + Math.random() * 900000).toString()
+    // Expiración en 15 minutos (900,000 milisegundos)
+    const expiracion = new Date(Date.now() + 15 * 60 * 1000)
+
+    // Guardar el código y la expiración en la base de datos
+    await pool.query(
+      'UPDATE usuarios SET codigo_recuperacion = ?, expiracion_codigo = ? WHERE id = ?',
+      [codigo, expiracion, usuario.id]
+    )
+
+    // Enviar el correo
+    const transporter = getMailTransporter()
+    const mailOptions = {
+      from: `"Protección Civil Carabobo" <${process.env.SMTP_USER || 'no-reply@proteccioncivil.gob.ve'}>`,
+      to: correoNorm,
+      subject: 'Código de Recuperación de Contraseña — Protección Civil',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #dde5ef; border-radius: 8px; background-color: #f2f6fb;">
+          <h2 style="color: #0033CC; text-align: center;">Protección Civil Carabobo</h2>
+          <p>Hola <strong>${usuario.nombre} ${usuario.apellido}</strong>,</p>
+          <p>Hemos recibido una solicitud para restablecer la contraseña de acceso a tu cuenta.</p>
+          <div style="background-color: #ffffff; border: 2px dashed #FF8000; padding: 15px; text-align: center; margin: 20px 0; border-radius: 8px;">
+            <p style="font-size: 14px; margin: 0; color: #4a4a55;">Tu código de verificación de 6 dígitos es:</p>
+            <h1 style="font-size: 36px; margin: 10px 0; color: #800000; letter-spacing: 5px;">${codigo}</h1>
+            <p style="font-size: 12px; margin: 0; color: #800000;">Este código expirará en 15 minutos.</p>
+          </div>
+          <p style="font-size: 13px; color: #4a4a55;">Si no has solicitado este cambio, por favor ignora este correo electrónico.</p>
+          <hr style="border: 0; border-top: 1px solid #dde5ef; margin: 20px 0;" />
+          <p style="font-size: 11px; color: #854d0e; text-align: center;">Sistema de Emergencias e Incidentes — Estado Carabobo</p>
+        </div>
+      `
+    }
+
+    await transporter.sendMail(mailOptions)
+
+    res.json({ ok: true, message: 'Código de recuperación enviado con éxito a su correo.' })
+  } catch (err) {
+    console.error('Error al solicitar código de recuperación:', err)
+    res.status(500).json({ error: 'Error al enviar el correo de recuperación. Verifique la configuración del servidor SMTP.' })
+  }
+})
+
+// 2. VERIFICAR CÓDIGO Y ESTABLECER NUEVA CONTRASEÑA
+router.post('/cambiar-password', async (req, res) => {
+  try {
+    const { correo, codigo, password } = req.body
+
+    if (!correo || !codigo || !password) {
+      return res.status(400).json({ error: 'El correo, el código de verificación y la nueva contraseña son requeridos.' })
+    }
+
+    const correoNorm = correo.toString().trim().toLowerCase()
+    const codigoNorm = codigo.toString().trim()
+
+    if (password.length < MIN_PASSWORD_LENGTH) {
+      return res.status(400).json({ error: `La contraseña debe tener al menos ${MIN_PASSWORD_LENGTH} caracteres.` })
+    }
+
+    // Buscar al usuario que tenga el código y que no haya expirado
+    const [usuarios] = await pool.query(
+      'SELECT id, codigo_recuperacion, expiracion_codigo FROM usuarios WHERE correo = ?',
+      [correoNorm]
+    )
+
+    if (usuarios.length === 0) {
+      return res.status(404).json({ error: 'Usuario no encontrado.' })
+    }
+
+    const usuario = usuarios[0]
+
+    // Validar el código de recuperación
+    if (!usuario.codigo_recuperacion || usuario.codigo_recuperacion !== codigoNorm) {
+      return res.status(400).json({ error: 'El código de verificación es incorrecto.' })
+    }
+
+    // Validar expiración
+    const ahora = new Date()
+    const expiracion = new Date(usuario.expiracion_codigo)
+    if (ahora > expiracion) {
+      return res.status(400).json({ error: 'El código de verificación ha expirado. Por favor, solicite uno nuevo.' })
+    }
+
+    // Todo correcto: Encriptar nueva contraseña y actualizar
+    const password_hash = await bcrypt.hash(password, SALT_ROUNDS)
+    await pool.query(
+      'UPDATE usuarios SET password_hash = ?, codigo_recuperacion = NULL, expiracion_codigo = NULL WHERE id = ?',
+      [password_hash, usuario.id]
+    )
+
+    res.json({ ok: true, message: 'Su contraseña ha sido restablecida con éxito.' })
+  } catch (err) {
+    console.error('Error al restablecer contraseña:', err)
+    res.status(500).json({ error: 'Error interno del servidor al intentar cambiar la contraseña.' })
+  }
+})
+
 export default router
+

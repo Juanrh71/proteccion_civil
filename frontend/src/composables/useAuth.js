@@ -40,6 +40,14 @@ export function useAuth() {
     usuario.value = authApi.getUsuario()
   }
 
+  function solicitarCodigoRecuperacion(correo) {
+    return authApi.solicitarCodigoRecuperacion(correo)
+  }
+
+  function cambiarPasswordConCodigo(correo, codigo, password) {
+    return authApi.cambiarPasswordConCodigo(correo, codigo, password)
+  }
+
   return {
     token: computed(() => token.value),
     usuario: computed(() => usuario.value),
@@ -51,5 +59,8 @@ export function useAuth() {
     logout,
     initFromStorage,
     getToken: authApi.getToken,
+    solicitarCodigoRecuperacion,
+    cambiarPasswordConCodigo,
   }
 }
+
