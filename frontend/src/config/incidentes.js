@@ -26,31 +26,31 @@ export const TIPOS_INCIDENTE = [
   { id: 'colision_vehiculo_animal', nombre: 'Colisión Vehículo - Animal', categoria: 'vial', clasificacion: CLASIFICACION_EMERGENTE },
 
   // Incendio
-  { id: 'vegetacion', nombre: 'Vegetacion', categoria: 'incendio', clasificacion: CLASIFICACION_EMERGENTE },
+  { id: 'vegetacion', nombre: 'Vegetación', categoria: 'incendio', clasificacion: CLASIFICACION_EMERGENTE },
   { id: 'estructura', nombre: 'Estructura', categoria: 'incendio', clasificacion: CLASIFICACION_EMERGENTE },
-  { id: 'vehiculo_incendio', nombre: 'Vehiculo', categoria: 'incendio', clasificacion: CLASIFICACION_EMERGENTE },
-  { id: 'equipos_electricos', nombre: 'Equipos electricos', categoria: 'incendio', clasificacion: CLASIFICACION_EMERGENTE },
-  { id: 'desechos_solidos', nombre: 'Desechos solidos', categoria: 'incendio', clasificacion: CLASIFICACION_EMERGENTE },
+  { id: 'vehiculo_incendio', nombre: 'Vehículo', categoria: 'incendio', clasificacion: CLASIFICACION_EMERGENTE },
+  { id: 'equipos_electricos', nombre: 'Equipos eléctricos', categoria: 'incendio', clasificacion: CLASIFICACION_EMERGENTE },
+  { id: 'desechos_solidos', nombre: 'Desechos sólidos', categoria: 'incendio', clasificacion: CLASIFICACION_EMERGENTE },
   { id: 'vertedero_de_basura', nombre: 'Vertedero de basura', categoria: 'incendio', clasificacion: CLASIFICACION_EMERGENTE },
-  { id: 'deflagracion', nombre: 'Deflagracion', categoria: 'incendio', clasificacion: CLASIFICACION_EMERGENTE },
-  { id: 'embarcacion_incendio', nombre: 'Embarcacion', categoria: 'incendio', clasificacion: CLASIFICACION_EMERGENTE },
+  { id: 'deflagracion', nombre: 'Deflagración', categoria: 'incendio', clasificacion: CLASIFICACION_EMERGENTE },
+  { id: 'embarcacion_incendio', nombre: 'Embarcación', categoria: 'incendio', clasificacion: CLASIFICACION_EMERGENTE },
   { id: 'mat_pel', nombre: 'Mat-Pel', categoria: 'incendio', clasificacion: CLASIFICACION_EMERGENTE },
-  { id: 'pirotecnico', nombre: 'Pirotecnico', categoria: 'incendio', clasificacion: CLASIFICACION_EMERGENTE },
+  { id: 'pirotecnico', nombre: 'Pirotécnico', categoria: 'incendio', clasificacion: CLASIFICACION_EMERGENTE },
 
   // Búsqueda y Rescate
   { id: 'persona_desaparecida_en_montana', nombre: 'Persona desaparecida en montaña', categoria: 'rescate', clasificacion: CLASIFICACION_EMERGENTE },
   { id: 'persona_desaparecida_en_agua', nombre: 'Persona desaparecida en agua', categoria: 'rescate', clasificacion: CLASIFICACION_EMERGENTE },
-  { id: 'busqueda_y_rescate_en_areas_confinadas', nombre: 'Busqueda y Rescate en areas confinadas', categoria: 'rescate', clasificacion: CLASIFICACION_EMERGENTE },
+  { id: 'busqueda_y_rescate_en_areas_confinadas', nombre: 'Búsqueda y Rescate en áreas confinadas', categoria: 'rescate', clasificacion: CLASIFICACION_EMERGENTE },
   { id: 'rescate_en_ascensor', nombre: 'Rescate en ascensor', categoria: 'rescate', clasificacion: CLASIFICACION_EMERGENTE },
   { id: 'rescate_de_persona_en_agua', nombre: 'Rescate de persona en agua', categoria: 'rescate', clasificacion: CLASIFICACION_EMERGENTE },
   { id: 'rescate_animal', nombre: 'Rescate animal', categoria: 'rescate', clasificacion: CLASIFICACION_EMERGENTE },
-  { id: 'recuperacion_de_cadaver', nombre: 'Recuperacion de cadaver', categoria: 'rescate', clasificacion: CLASIFICACION_EMERGENTE },
+  { id: 'recuperacion_de_cadaver', nombre: 'Recuperación de cadáver', categoria: 'rescate', clasificacion: CLASIFICACION_EMERGENTE },
 
   // Guardia de Seguridad y Prevención
-  { id: 'guardia_de_seguridad_y_prevencion', nombre: 'Guardia de Seguridad y Prevencion', categoria: 'prevencion', clasificacion: CLASIFICACION_NO_EMERGENTE },
-  { id: 'atencion_paramedica', nombre: 'Atencion paramedica', categoria: 'medico', clasificacion: CLASIFICACION_NO_EMERGENTE },
-  { id: 'atencion_medica', nombre: 'Atencion medica', categoria: 'medico', clasificacion: CLASIFICACION_NO_EMERGENTE },
-  { id: 'puesto_de_atencion', nombre: 'Puesto de Atencion', categoria: 'prevencion', clasificacion: CLASIFICACION_NO_EMERGENTE },
+  { id: 'guardia_de_seguridad_y_prevencion', nombre: 'Guardia de Seguridad y Prevención', categoria: 'prevencion', clasificacion: CLASIFICACION_NO_EMERGENTE },
+  { id: 'atencion_paramedica', nombre: 'Atención paramédica', categoria: 'medico', clasificacion: CLASIFICACION_NO_EMERGENTE },
+  { id: 'atencion_medica', nombre: 'Atención médica', categoria: 'medico', clasificacion: CLASIFICACION_NO_EMERGENTE },
+  { id: 'puesto_de_atencion', nombre: 'Puesto de Atención', categoria: 'prevencion', clasificacion: CLASIFICACION_NO_EMERGENTE },
   { id: 'punto_de_control', nombre: 'Punto de Control', categoria: 'prevencion', clasificacion: CLASIFICACION_NO_EMERGENTE },
 
   // Condición Arbórea
@@ -77,9 +77,9 @@ export const TIPOS_INCIDENTE = [
   { id: 'precipitaciones_torrenciales', nombre: 'Precipitaciones torrenciales', categoria: 'clima', clasificacion: CLASIFICACION_EMERGENTE },
 
   // Hidrometeorológico
-  { id: 'anegacion', nombre: 'Anegacion', categoria: 'socio_natural', clasificacion: CLASIFICACION_EMERGENTE },
-  { id: 'inhundacion', nombre: 'Inhundacion', categoria: 'socio_natural', clasificacion: CLASIFICACION_EMERGENTE },
-  { id: 'desbordamiento_cano_rio_canal', nombre: 'Desbordamiento (caño, rio, canal)', categoria: 'socio_natural', clasificacion: CLASIFICACION_EMERGENTE },
+  { id: 'anegacion', nombre: 'Anegación', categoria: 'socio_natural', clasificacion: CLASIFICACION_EMERGENTE },
+  { id: 'inhundacion', nombre: 'Inundación', categoria: 'socio_natural', clasificacion: CLASIFICACION_EMERGENTE },
+  { id: 'desbordamiento_cano_rio_canal', nombre: 'Desbordamiento (caño, río, canal)', categoria: 'socio_natural', clasificacion: CLASIFICACION_EMERGENTE },
 
   // Colapso de Estructura
   { id: 'colapso_de_estructura', nombre: 'Colapso de estructura', categoria: 'socio_natural', clasificacion: CLASIFICACION_EMERGENTE },
@@ -89,7 +89,7 @@ export const TIPOS_INCIDENTE = [
   { id: 'enjambre_de_abejas', nombre: 'Enajmbre de abejas', categoria: 'prevencion', clasificacion: CLASIFICACION_NO_EMERGENTE },
   { id: 'enjambre_de_avispa', nombre: 'Enajmbre de avispa', categoria: 'prevencion', clasificacion: CLASIFICACION_NO_EMERGENTE },
   { id: 'serpiente', nombre: 'Serpiente', categoria: 'prevencion', clasificacion: CLASIFICACION_NO_EMERGENTE },
-  { id: 'alacran', nombre: 'Alacran', categoria: 'prevencion', clasificacion: CLASIFICACION_NO_EMERGENTE },
+  { id: 'alacran', nombre: 'Alacrán', categoria: 'prevencion', clasificacion: CLASIFICACION_NO_EMERGENTE },
   { id: 'animal_agreste', nombre: 'Animal agreste', categoria: 'prevencion', clasificacion: CLASIFICACION_NO_EMERGENTE },
 
   // Eliminación de Peligro
@@ -131,7 +131,7 @@ export const PARROQUIAS_POR_MUNICIPIO = {
   'Carlos Arvelo': ['Belén', 'Güigüe', 'Tacarigua'],
 }
 
-export const RANGO_ANO_INICIO = 2025
+export const RANGO_ANO_INICIO = 2024
 export const RANGO_ANO_FIN = 2035
 
 export function añoSugeridoParaIncidentes() {

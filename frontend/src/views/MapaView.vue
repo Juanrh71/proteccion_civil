@@ -13,15 +13,59 @@
     </div>
     <div class="estado-bar card">
       <span class="activas">
-        Emergencias activas: <strong>{{ incidentes.length }}</strong>
+        Emergencias visibles: <strong>{{ incidentesFiltrados.length }}</strong>
+        <small v-if="hayFiltros">de {{ incidentes.length }}</small>
       </span>
       <span v-if="actualizando" class="polling">Actualizando…</span>
       <span v-else class="polling muted">Última actualización: {{ ultimaActualizacionTexto }}</span>
     </div>
     <p v-if="errorCarga" class="mapa-error" role="alert">{{ errorCarga }}</p>
 
+    <div class="filtros-mapa card" aria-label="Filtros del mapa en vivo">
+      <div class="filtro-busqueda">
+        <label>Buscar por categoría</label>
+        <div class="filtro-input-wrap">
+          <span class="filtro-lupa" aria-hidden="true"></span>
+          <input
+            v-model="filtroCategoria"
+            type="search"
+            class="input filtro-input"
+            list="categorias-mapa"
+            autocomplete="off"
+          />
+        </div>
+        <datalist id="categorias-mapa">
+          <option v-for="cat in categoriasBusqueda" :key="cat.id" :value="cat.nombre" />
+        </datalist>
+      </div>
+      <div class="filtro-busqueda">
+        <label>Buscar por región</label>
+        <div class="filtro-input-wrap">
+          <span class="filtro-lupa" aria-hidden="true"></span>
+          <input
+            v-model="filtroRegion"
+            type="search"
+            class="input filtro-input"
+            list="regiones-mapa"
+            autocomplete="off"
+          />
+        </div>
+        <datalist id="regiones-mapa">
+          <option v-for="region in regionesBusqueda" :key="region" :value="region" />
+        </datalist>
+      </div>
+      <button
+        v-if="hayFiltros"
+        type="button"
+        class="btn-limpiar-filtros"
+        @click="limpiarFiltros"
+      >
+        Limpiar filtros
+      </button>
+    </div>
+
     <div class="mapa-box card">
-      <MapaCarabobo :incidentes="incidentes" mostrar-buscador encuadrar-estado-carabobo />
+      <MapaCarabobo :incidentes="incidentesFiltrados" mostrar-buscador encuadrar-estado-carabobo />
     </div>
     <div class="leyenda card">
       <h3>Leyenda del mapa</h3>
@@ -42,12 +86,16 @@ import MapaCarabobo from '../components/MapaCarabobo.vue'
 import { obtenerIncidentes } from '../api/incidentes'
 import { useCatalogoIncidentes } from '../composables/useCatalogoIncidentes.js'
 import { useAuth } from '../composables/useAuth'
+import { MUNICIPIOS_CARABOBO } from '../config/incidentes.js'
+import { grupoExcelDeIncidente, nombreGrupoExcel } from '../utils/clasificacionExcelIncidentes.js'
 
 const router = useRouter()
 const { usuario } = useAuth()
 const esAdmin = computed(() => usuario.value?.rol === 'admin')
 const { leyendaMapa } = useCatalogoIncidentes()
 const incidentes = ref([])
+const filtroCategoria = ref('')
+const filtroRegion = ref('')
 const actualizando = ref(false)
 const ultimaActualizacion = ref(null)
 const errorCarga = ref('')
@@ -62,6 +110,57 @@ const ultimaActualizacionTexto = computed(() => {
 })
 
 const categoriasLeyenda = leyendaMapa
+const categoriasBusqueda = computed(() => categoriasLeyenda.value || [])
+const regionesBusqueda = computed(() => {
+  const set = new Set(MUNICIPIOS_CARABOBO)
+  for (const inc of incidentes.value) {
+    if (inc?.municipio) set.add(inc.municipio)
+    if (inc?.parroquia) set.add(inc.parroquia)
+  }
+  return Array.from(set).sort((a, b) => a.localeCompare(b, 'es'))
+})
+const hayFiltros = computed(() => !!filtroCategoria.value.trim() || !!filtroRegion.value.trim())
+
+function normalizarBusqueda(valor) {
+  return String(valor || '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '')
+}
+
+function coincideCategoria(inc, texto) {
+  const q = normalizarBusqueda(texto)
+  if (!q) return true
+  const grupo = grupoExcelDeIncidente(inc)
+  const nombreGrupo = nombreGrupoExcel(inc)
+  const campos = [
+    grupo,
+    nombreGrupo,
+    inc?.categoria,
+    inc?.tipo,
+    inc?.tipo_nombre,
+  ]
+  return campos.some((campo) => normalizarBusqueda(campo).includes(q))
+}
+
+function coincideRegion(inc, texto) {
+  const q = normalizarBusqueda(texto)
+  if (!q) return true
+  const campos = [inc?.municipio, inc?.parroquia, inc?.via]
+  return campos.some((campo) => normalizarBusqueda(campo).includes(q))
+}
+
+const incidentesFiltrados = computed(() =>
+  incidentes.value.filter(
+    (inc) => coincideCategoria(inc, filtroCategoria.value) && coincideRegion(inc, filtroRegion.value)
+  )
+)
+
+function limpiarFiltros() {
+  filtroCategoria.value = ''
+  filtroRegion.value = ''
+}
 
 function irMenuAdmin() {
   router.push('/usuarios')
@@ -109,7 +208,7 @@ onUnmounted(() => {
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 0.55rem;
+  gap: 0.38rem;
   overflow: hidden;
 }
 
@@ -118,6 +217,10 @@ onUnmounted(() => {
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
+}
+.mapa-head .page-title {
+  margin-bottom: 0;
+  font-size: 1.55rem;
 }
 
 .btn-menu-admin {
@@ -140,11 +243,16 @@ onUnmounted(() => {
   flex-wrap: wrap;
   align-items: center;
   gap: 1rem 1.25rem;
-  padding: 0.7rem 0.9rem;
+  padding: 0.42rem 0.7rem;
 }
 .activas {
   font-size: 0.9375rem;
   color: var(--color-text);
+}
+.activas small {
+  margin-left: 0.25rem;
+  color: var(--color-text-muted);
+  font-weight: 500;
 }
 .polling {
   font-size: 0.8125rem;
@@ -153,12 +261,75 @@ onUnmounted(() => {
 .polling.muted {
   color: var(--color-text-muted);
 }
+.filtros-mapa {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 0.55rem;
+  padding: 0.48rem 0.65rem;
+}
+.filtro-busqueda {
+  min-width: 0;
+}
+.filtro-busqueda label {
+  display: block;
+  margin-bottom: 0.16rem;
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: var(--color-secondary);
+}
+.filtro-input-wrap {
+  position: relative;
+}
+.filtro-lupa {
+  position: absolute;
+  left: 0.65rem;
+  top: 50%;
+  width: 0.78rem;
+  height: 0.78rem;
+  border: 2px solid #64748b;
+  border-radius: 999px;
+  transform: translateY(-55%);
+  pointer-events: none;
+}
+.filtro-lupa::after {
+  content: '';
+  position: absolute;
+  width: 0.45rem;
+  height: 2px;
+  right: -0.35rem;
+  bottom: -0.18rem;
+  background: #64748b;
+  transform: rotate(45deg);
+  border-radius: 999px;
+}
+.filtro-input {
+  width: 100%;
+  padding: 0.42rem 0.65rem 0.42rem 1.85rem;
+  min-height: 2.05rem;
+  font-size: 0.88rem;
+}
+.btn-limpiar-filtros {
+  min-height: 2.05rem;
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  color: var(--color-secondary);
+  border-radius: var(--radius, 8px);
+  padding: 0.36rem 0.7rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.btn-limpiar-filtros:hover {
+  background: #eef2ff;
+}
 .mapa-box {
-  padding: 0.4rem;
+  padding: 0.32rem;
   overflow: hidden;
   flex: 1;
-  min-height: 260px;
-  max-height: 430px;
+  min-height: 250px;
+  max-height: none;
   border-radius: 14px;
 }
 .mapa-box :deep(.mapa-wrapper),
@@ -167,19 +338,20 @@ onUnmounted(() => {
   border-radius: 10px;
 }
 .leyenda {
-  padding: 0.65rem 0.85rem;
+  padding: 0.48rem 0.65rem;
+  flex: 0 0 auto;
 }
 .leyenda h3 {
-  font-size: 0.9375rem;
+  font-size: 0.86rem;
   font-weight: 600;
-  margin-bottom: 0.45rem;
+  margin-bottom: 0.3rem;
   color: var(--color-secondary);
 }
 .leyenda-items {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
-  gap: 0.35rem 0.85rem;
-  max-height: 160px;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.24rem 0.65rem;
+  max-height: 120px;
   overflow-y: auto;
   padding-right: 0.2rem;
 }
@@ -188,14 +360,14 @@ onUnmounted(() => {
   align-items: center;
   gap: 0.45rem;
   min-width: 0;
-  font-size: 0.79rem;
+  font-size: 0.74rem;
   color: var(--color-text-muted);
-  line-height: 1.28;
+  line-height: 1.18;
   white-space: normal;
 }
 .leyenda-item i {
-  width: 14px;
-  height: 14px;
+  width: 11px;
+  height: 11px;
   border-radius: 50%;
   border: 1px solid rgba(15, 23, 42, 0.28);
   display: inline-block;
@@ -206,13 +378,19 @@ onUnmounted(() => {
   .mapa-view {
     max-width: 100%;
   }
+  .filtros-mapa {
+    grid-template-columns: 1fr;
+    gap: 0.55rem;
+  }
+  .btn-limpiar-filtros {
+    width: 100%;
+  }
   .mapa-box {
-    padding: 0.35rem;
-    max-height: 360px;
+    padding: 0.28rem;
   }
   .leyenda-items {
     grid-template-columns: 1fr 1fr;
-    max-height: none;
+    max-height: 110px;
   }
 }
 

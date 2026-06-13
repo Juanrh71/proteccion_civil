@@ -24,8 +24,8 @@ export function useAuth() {
     return authApi.listarUsuarios(estatus)
   }
 
-  function cambiarEstatusUsuario(id, estatus) {
-    return authApi.cambiarEstatusUsuario(id, estatus)
+  function cambiarEstatusUsuario(id, estatus, motivoBloqueo = '') {
+    return authApi.cambiarEstatusUsuario(id, estatus, motivoBloqueo)
   }
 
   function logout() {

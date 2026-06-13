@@ -173,6 +173,6 @@ export function descargarPdfTablaIncidentes({
   }
 
   alert(
-    'No se pudo descargar el PDF. Pruebe con otro navegador o use el listado en Incidentes (Descargar PDF) o imprima esta pagina desde el menu del navegador.'
+    'No se pudo descargar el PDF. Pruebe con otro navegador o use el listado en Incidentes (Descargar PDF) o imprima esta página desde el menú del navegador.'
   )
 }

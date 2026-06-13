@@ -45,8 +45,34 @@ function idUsuarioAutenticado(req) {
   }
 }
 
+async function usuarioAutenticado(req) {
+  const id = idUsuarioAutenticado(req)
+  if (id == null) return null
+  const [rows] = await pool.query(
+    'SELECT id, nombre, apellido, cedula, telefono, rol, estatus FROM usuarios WHERE id = ?',
+    [id]
+  )
+  return rows[0] || null
+}
+
+async function requireAdmin(req, res, next) {
+  try {
+    const usuario = await usuarioAutenticado(req)
+    if (!usuario) return res.status(401).json({ error: 'No autorizado.' })
+    const estatus = String(usuario.estatus || '').trim().toLowerCase()
+    const activo = estatus === 'activo' || estatus === 'aprobado'
+    if (!activo || usuario.rol !== 'admin') {
+      return res.status(403).json({ error: 'Acceso solo para administrador.' })
+    }
+    req.authUser = usuario
+    next()
+  } catch {
+    return res.status(401).json({ error: 'Token inválido o expirado.' })
+  }
+}
+
 const SELECT_CAMPOS =
-  'id, tipo, tipo_nombre, categoria, descripcion, lat, lng, municipio, parroquia, via, fecha, cerrado, estado, resultado_cierre, observacion_cierre_abierto, heridos_cierre, fallecidos_cierre'
+  'id, tipo, tipo_nombre, categoria, descripcion, lat, lng, municipio, parroquia, via, fecha, cerrado, estado, resultado_cierre, observacion_cierre_abierto, heridos_cierre, fallecidos_cierre, procedencia, evidencia_visual'
 
 function estadoDesdeFila(r) {
   const cerr = r.cerrado === 1 || r.cerrado === true
@@ -201,6 +227,8 @@ function mapRow(r) {
     resultado_cierre: r.resultado_cierre != null ? String(r.resultado_cierre) : '',
     observacion_cierre_abierto:
       r.observacion_cierre_abierto != null ? String(r.observacion_cierre_abierto) : '',
+    procedencia: r.procedencia != null ? String(r.procedencia) : '',
+    evidencia_visual: r.evidencia_visual != null ? String(r.evidencia_visual) : '',
     heridos_cierre: hc,
     fallecidos_cierre: fc,
     segundos_desde_registro:
@@ -208,6 +236,69 @@ function mapRow(r) {
         ? Number(r.segundos_desde_registro)
         : undefined,
   }
+}
+
+function jsonSeguro(valor, fallback) {
+  try {
+    if (valor == null || valor === '') return fallback
+    if (typeof valor === 'object') return valor
+    return JSON.parse(String(valor))
+  } catch {
+    return fallback
+  }
+}
+
+const CAMPOS_AUDITORIA_INCIDENTE = [
+  'tipo',
+  'tipo_nombre',
+  'categoria',
+  'descripcion',
+  'lat',
+  'lng',
+  'municipio',
+  'parroquia',
+  'via',
+]
+
+function snapshotAuditoriaIncidente(row) {
+  const out = {}
+  for (const campo of CAMPOS_AUDITORIA_INCIDENTE) {
+    const valor = row?.[campo]
+    out[campo] = valor == null ? null : valor
+  }
+  return out
+}
+
+function camposModificados(antes, despues) {
+  const cambios = []
+  for (const campo of CAMPOS_AUDITORIA_INCIDENTE) {
+    const a = antes[campo] == null ? '' : String(antes[campo])
+    const d = despues[campo] == null ? '' : String(despues[campo])
+    if (a !== d) cambios.push(campo)
+  }
+  return cambios
+}
+
+async function registrarAuditoriaIncidente({ incidenteId, usuario, antes, despues }) {
+  const cambios = camposModificados(antes, despues)
+  if (cambios.length === 0) return
+  await pool.query(
+    `INSERT INTO auditoria_incidentes
+     (incidente_id, usuario_id, usuario_nombre, usuario_apellido, usuario_cedula, usuario_telefono,
+      datos_antes, datos_despues, campos_modificados)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      incidenteId,
+      usuario?.id || null,
+      usuario?.nombre || null,
+      usuario?.apellido || null,
+      usuario?.cedula || null,
+      usuario?.telefono || null,
+      JSON.stringify(antes),
+      JSON.stringify(despues),
+      JSON.stringify(cambios),
+    ]
+  )
 }
 
 /** Catálogo para la app (primer dropdown) */
@@ -403,14 +494,19 @@ router.get('/mapa-global', async (req, res) => {
         i.categoria, 
         i.lat, 
         i.lng, 
-        i.estado, 
+        i.estado,
+        i.cerrado,
+        i.municipio,
+        i.parroquia,
+        i.via,
         i.created_at,
         c.color AS color_categoria,
         t.color AS color_tipo
       FROM incidentes i
       LEFT JOIN tipos_de_incidentes t ON i.tipo = t.slug
       LEFT JOIN categorias_incidentes c ON t.id_categoria = c.id
-      WHERE i.estado != 'cerrado' 
+      WHERE (i.cerrado = 0 OR i.cerrado IS NULL)
+        AND (i.estado IS NULL OR i.estado IN ('abierto', 'en_proceso'))
       ORDER BY i.created_at DESC`
 
     const [rows] = await pool.query(query)
@@ -420,6 +516,56 @@ router.get('/mapa-global', async (req, res) => {
     res.status(500).json({ error: 'Error al cargar el mapa' })
   }
 })
+
+router.get('/auditoria-ediciones', requireAdmin, async (_req, res) => {
+  try {
+    const [rows] = await pool.query(
+      `SELECT
+         a.id,
+         a.incidente_id,
+         a.usuario_id,
+         a.usuario_nombre,
+         a.usuario_apellido,
+         a.usuario_cedula,
+         a.usuario_telefono,
+         a.fecha_edicion,
+         a.datos_antes,
+         a.datos_despues,
+         a.campos_modificados,
+         i.tipo_nombre,
+         i.municipio,
+         i.parroquia,
+         i.fecha
+       FROM auditoria_incidentes a
+       LEFT JOIN incidentes i ON i.id = a.incidente_id
+       ORDER BY a.fecha_edicion DESC
+       LIMIT 300`
+    )
+    res.json(
+      rows.map((r) => ({
+        id: r.id,
+        incidente_id: r.incidente_id,
+        usuario_id: r.usuario_id,
+        usuario_nombre: r.usuario_nombre || '',
+        usuario_apellido: r.usuario_apellido || '',
+        usuario_cedula: r.usuario_cedula || '',
+        usuario_telefono: r.usuario_telefono || '',
+        fecha_edicion: r.fecha_edicion ? new Date(r.fecha_edicion).toISOString() : null,
+        incidente_tipo: r.tipo_nombre || '',
+        incidente_municipio: r.municipio || '',
+        incidente_parroquia: r.parroquia || '',
+        incidente_fecha: r.fecha ? new Date(r.fecha).toISOString() : null,
+        datos_antes: jsonSeguro(r.datos_antes, {}),
+        datos_despues: jsonSeguro(r.datos_despues, {}),
+        campos_modificados: jsonSeguro(r.campos_modificados, []),
+      }))
+    )
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Error al consultar auditoría de incidentes.' })
+  }
+})
+
 router.get('/', async (req, res) => {
   try {
     await autoCerrarIncidentesLluviaPorTiempo()
@@ -613,7 +759,7 @@ router.put('/:id', async (req, res) => {
     const id = parseInt(req.params.id, 10)
     if (isNaN(id)) return res.status(400).json({ error: 'Id inválido' })
     const [prevRows] = await pool.query(
-      'SELECT cerrado, estado, fecha, TIMESTAMPDIFF(SECOND, fecha, NOW()) AS segundos_desde_registro FROM incidentes WHERE id = ?',
+      `SELECT ${SELECT_CAMPOS}, TIMESTAMPDIFF(SECOND, fecha, NOW()) AS segundos_desde_registro FROM incidentes WHERE id = ?`,
       [id]
     )
     if (!prevRows || prevRows.length === 0) {
@@ -644,6 +790,8 @@ router.put('/:id', async (req, res) => {
       return res.status(400).json({ error: errorUbicacion })
     }
     const viaVal = String(via).trim()
+    const antesAuditoria = snapshotAuditoriaIncidente(previo)
+    const usuarioEditor = await usuarioAutenticado(req)
     const [result] = await pool.query(
       `UPDATE incidentes SET tipo = ?, tipo_nombre = ?, categoria = ?, descripcion = ?, lat = ?, lng = ?, municipio = ?, parroquia = ?, via = ? WHERE id = ?`,
       [
@@ -666,6 +814,13 @@ router.put('/:id', async (req, res) => {
       `SELECT ${SELECT_CAMPOS} FROM incidentes WHERE id = ?`,
       [id]
     )
+    const despuesAuditoria = snapshotAuditoriaIncidente(rows[0])
+    await registrarAuditoriaIncidente({
+      incidenteId: id,
+      usuario: usuarioEditor,
+      antes: antesAuditoria,
+      despues: despuesAuditoria,
+    })
     res.json(mapRow(rows[0]))
   } catch (err) {
     console.error(err)

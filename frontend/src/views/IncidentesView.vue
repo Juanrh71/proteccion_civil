@@ -50,7 +50,6 @@
           @click="vistaLista = 'abiertos'"
         >
           <span class="vista-tab-titulo">Abiertos</span>
-          <span class="vista-tab-sub">Recibidos, pendientes de despacho</span>
           <span class="vista-tab-num">{{ conteoAbiertos }}</span>
         </button>
         <button
@@ -62,7 +61,6 @@
           @click="vistaLista = 'en_proceso'"
         >
           <span class="vista-tab-titulo">En proceso</span>
-          <span class="vista-tab-sub">Atención o seguimiento activo</span>
           <span class="vista-tab-num">{{ conteoEnProceso }}</span>
         </button>
         <button
@@ -74,9 +72,22 @@
           @click="vistaLista = 'cerrados'"
         >
           <span class="vista-tab-titulo">Cerrados</span>
-          <span class="vista-tab-sub">Incidente finalizado</span>
           <span class="vista-tab-num">{{ conteoCerrados }}</span>
         </button>
+      </div>
+      <div class="leyenda-estados" aria-label="Leyenda de colores por estado">
+        <span class="leyenda-estado">
+          <i class="leyenda-estado-color leyenda-estado-color--abierto"></i>
+          Abiertos
+        </span>
+        <span class="leyenda-estado">
+          <i class="leyenda-estado-color leyenda-estado-color--proceso"></i>
+          En proceso
+        </span>
+        <span class="leyenda-estado">
+          <i class="leyenda-estado-color leyenda-estado-color--cerrado"></i>
+          Cerrados
+        </span>
       </div>
     </div>
 
@@ -306,13 +317,13 @@
       <div class="edan-head">
         <h2 class="comparativa-viz-titulo">Reportes EDAN</h2>
         <div class="edan-buscar">
-          <label for="buscar-planilla-edan">Buscar por numero de planilla</label>
+          <label for="buscar-planilla-edan">Buscar por número de planilla</label>
           <input
             id="buscar-planilla-edan"
             v-model="filtroPlanillaEdan"
             type="text"
             class="input"
-            placeholder="Escriba numero de planilla…"
+            placeholder="Escriba número de planilla…"
           />
         </div>
       </div>
@@ -326,7 +337,7 @@
               <th>Propietario</th>
               <th>Municipio</th>
               <th>Parroquia</th>
-              <th>Afectacion</th>
+              <th>Afectación</th>
               <th>Total personas</th>
               <th class="th-acc">Acc.</th>
             </tr>
@@ -379,6 +390,13 @@
           <div class="form-group">
             <label>Descripción</label>
             <textarea v-model="formEditar.descripcion" class="input" rows="2"></textarea>
+          </div>
+          <div v-if="evidenciaEdicionUrl" class="form-group evidencia-adjunta">
+            <label>Imagen adjunta desde la app móvil</label>
+            <a :href="evidenciaEdicionUrl" target="_blank" rel="noopener" class="evidencia-link">
+              <img :src="evidenciaEdicionUrl" alt="Evidencia visual del reporte móvil" class="evidencia-img" />
+            </a>
+            <p class="evidencia-ayuda">Toque la imagen para verla en tamaño completo.</p>
           </div>
           <div class="form-group">
             <label>Calle, avenida o referencia</label>
@@ -576,6 +594,7 @@ import {
   actualizarIncidente,
   cerrarIncidente,
   actualizarEstadoIncidente,
+  obtenerUrlEvidencia,
 } from '../api/incidentes'
 import { obtenerUbicacionInversa } from '../api/geocoding.js'
 import { TIPOS_INCIDENTE, MUNICIPIOS_CARABOBO, MAPA_CENTRO_CARABOBO, PARROQUIAS_POR_MUNICIPIO } from '../config/incidentes'
@@ -612,6 +631,7 @@ const abrirMunicipios = ref(false)
 const abrirParroquias = ref(false)
 const mostrarModal = ref(false)
 const editingId = ref(null)
+const incidenteEnEdicion = ref(null)
 const tipoEdicionFijo = ref('')
 const tipoEdicionNombre = ref('')
 const fechaEdicionFija = ref('')
@@ -633,6 +653,11 @@ const errorResultadoCierre = ref('')
 const enviandoResultadoCierre = ref(false)
 
 const cierreDesdeEnProceso = computed(() => incidenteResultadoCierre.value?.estado === 'en_proceso')
+const evidenciaEdicionUrl = computed(() => {
+  const inc = incidenteEnEdicion.value
+  if (!inc || inc.procedencia !== 'movil' || !inc.evidencia_visual) return ''
+  return obtenerUrlEvidencia(inc.evidencia_visual)
+})
 const avisoResultadoGuardado = ref('')
 const errorCargaLista = ref('')
 const errorCargaEdan = ref('')
@@ -643,6 +668,7 @@ const listaFetchMs = ref(Date.now())
 let relojEdicion = null
 let refrescarIncidentesTimer = null
 let refrescarIncidentesEnProgreso = false
+let avisoResultadoTimer = null
 let secuenciaReverseMunicipio = 0
 const edanLista = ref([])
 const filtroPlanillaEdan = ref('')
@@ -821,6 +847,18 @@ function textoEstadoListado(inc) {
   return 'Abierto'
 }
 
+function mostrarAvisoResultado(mensaje) {
+  if (avisoResultadoTimer != null) {
+    window.clearTimeout(avisoResultadoTimer)
+    avisoResultadoTimer = null
+  }
+  avisoResultadoGuardado.value = mensaje
+  avisoResultadoTimer = window.setTimeout(() => {
+    avisoResultadoGuardado.value = ''
+    avisoResultadoTimer = null
+  }, 2000)
+}
+
 function segundosDesdeRegistroEstimados(inc) {
   if (!inc) return Infinity
   const s = inc.segundos_desde_registro
@@ -907,6 +945,7 @@ function abrirEditar(inc) {
     return
   }
   editingId.value = inc.id
+  incidenteEnEdicion.value = inc
   tipoEdicionFijo.value = inc.tipo ? inc.tipo : ''
   tipoEdicionNombre.value = inc.tipo_nombre || inc.tipo || '—'
   fechaEdicionFija.value = formatearFecha(inc.fecha)
@@ -983,6 +1022,7 @@ async function asignarCoordenadasEdicion(coords) {
 function cerrarModal() {
   mostrarModal.value = false
   editingId.value = null
+  incidenteEnEdicion.value = null
   tipoEdicionFijo.value = ''
   tipoEdicionNombre.value = ''
   fechaEdicionFija.value = ''
@@ -997,6 +1037,9 @@ async function marcarEstadoOperativo(inc, estado) {
     await actualizarEstadoIncidente(inc.id, estado)
     aplicarListaIncidentesDesdeApi(await obtenerIncidentes())
     errorCargaLista.value = ''
+    if (estado === 'en_proceso') {
+      mostrarAvisoResultado('Incidente pasado a en proceso correctamente.')
+    }
   } catch (e) {
     let msg = 'No se pudo actualizar el estado.'
     if (e.response && e.response.data && e.response.data.error) {
@@ -1113,10 +1156,7 @@ async function enviarResultadoCierre() {
     errorCargaLista.value = ''
     cancelarModalResultado()
     if (mostrarModal.value && editingId.value === inc.id) cerrarModal()
-    avisoResultadoGuardado.value = 'Incidente cerrado correctamente.'
-    window.setTimeout(() => {
-      avisoResultadoGuardado.value = ''
-    }, 8000)
+    mostrarAvisoResultado('Incidente cerrado correctamente.')
   } catch (e) {
     let msg = 'No se pudo cerrar el incidente.'
     if (e.response && e.response.data && e.response.data.error) {
@@ -1190,8 +1230,9 @@ async function refrescarIncidentes() {
 }
 
 function aplicarListaIncidentesDesdeApi(data) {
-  incidentes.value = Array.isArray(data) ? data : []
+  if (!Array.isArray(data)) return
   listaFetchMs.value = Date.now()
+  incidentes.value = data
 }
 
 onMounted(async () => {
@@ -1217,6 +1258,10 @@ onUnmounted(() => {
   if (refrescarIncidentesTimer != null) {
     clearInterval(refrescarIncidentesTimer)
     refrescarIncidentesTimer = null
+  }
+  if (avisoResultadoTimer != null) {
+    clearTimeout(avisoResultadoTimer)
+    avisoResultadoTimer = null
   }
 })
 </script>
@@ -1491,14 +1536,13 @@ onUnmounted(() => {
   font-size: 0.85rem;
 }
 .total {
-  padding: 0.4rem 0.1rem 0.15rem;
-  font-size: 0.8rem;
-  color: var(--color-text-muted);
+  padding: 0.55rem 0.85rem 0.65rem;
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--color-secondary);
   border-top: 1px solid #e2e8f0;
   flex-shrink: 0;
-  position: sticky;
-  bottom: 0;
-  z-index: 2;
   background: var(--color-surface-card, #fff);
 }
 .leyenda-acciones {
@@ -1506,23 +1550,31 @@ onUnmounted(() => {
   flex-wrap: wrap;
   align-items: center;
   justify-content: flex-start;
-  gap: 0.5rem 1rem;
-  padding: 0.5rem 0.1rem 0.35rem;
-  font-size: 0.75rem;
-  color: var(--color-text-muted);
+  gap: 0.55rem 0.85rem;
+  padding: 0.65rem 0.85rem;
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: var(--color-text);
+  border-top: 1px solid #e8edf3;
   border-bottom: 1px solid #e8edf3;
+  background: #f8fbff;
   flex-shrink: 0;
 }
 .leyenda-item {
   display: inline-flex;
   align-items: center;
   justify-content: flex-start;
-  gap: 0.4rem;
+  gap: 0.45rem;
+  min-height: 2rem;
 }
 .leyenda-icon-muestra {
   pointer-events: none;
   cursor: default;
   flex-shrink: 0;
+  width: 1.7rem;
+  height: 1.7rem;
+  min-width: 1.7rem;
+  min-height: 1.7rem;
 }
 .btn-sm {
   padding: 0.35rem 0.6rem;
@@ -1640,7 +1692,7 @@ onUnmounted(() => {
 }
 .vista-por-estado {
   margin-bottom: 0.45rem;
-  padding: 0.45rem 0.6rem;
+  padding: 0.55rem 0.65rem;
   flex-shrink: 0;
 }
 .vista-por-estado-inner {
@@ -1649,44 +1701,84 @@ onUnmounted(() => {
   gap: 0.5rem;
 }
 .vista-tab {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
   text-align: left;
-  gap: 0.2rem;
-  padding: 0.65rem 0.75rem;
-  border-radius: 10px;
-  border: 1px solid #c8d3e1;
-  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  gap: 1rem;
+  min-height: 4.8rem;
+  padding: 0.9rem 1.1rem;
+  border-radius: 14px;
+  border: 1px solid rgba(15, 23, 42, 0.12);
   color: var(--color-text);
   cursor: pointer;
-  transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+  transition: border-color 0.15s, box-shadow 0.15s, transform 0.12s;
   font: inherit;
 }
+.vista-tab:nth-child(1) {
+  background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%);
+  border-color: #86efac;
+}
+.vista-tab:nth-child(2) {
+  background: linear-gradient(135deg, #fef9c3 0%, #fde68a 100%);
+  border-color: #facc15;
+}
+.vista-tab:nth-child(3) {
+  background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+  border-color: #fca5a5;
+}
 .vista-tab:hover {
-  border-color: #94a3b8;
-  background: #fff;
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.1);
 }
 .vista-tab.activa {
   border-color: #0033cc;
-  box-shadow: 0 0 0 2px rgba(0, 51, 204, 0.12);
-  background: linear-gradient(180deg, #f0f4ff 0%, #e8efff 100%);
+  box-shadow: 0 0 0 2px rgba(0, 51, 204, 0.18), 0 8px 18px rgba(15, 23, 42, 0.12);
 }
 .vista-tab-titulo {
-  font-weight: 700;
-  font-size: 0.95rem;
+  font-weight: 800;
+  font-size: 1.35rem;
   color: var(--color-secondary);
 }
-.vista-tab-sub {
-  font-size: 0.72rem;
-  color: var(--color-text-muted);
-  line-height: 1.25;
-}
 .vista-tab-num {
-  margin-top: 0.15rem;
-  font-size: 1.1rem;
-  font-weight: 700;
+  justify-self: end;
+  min-width: 3rem;
+  text-align: right;
+  font-size: 2.25rem;
+  line-height: 1;
+  font-weight: 900;
   color: #0033cc;
+}
+.leyenda-estados {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  align-items: center;
+  margin-top: 0.55rem;
+  padding: 0.2rem 0.2rem 0;
+}
+.leyenda-estado {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: var(--color-text-muted);
+}
+.leyenda-estado-color {
+  width: 0.95rem;
+  height: 0.95rem;
+  border-radius: 999px;
+  border: 1px solid rgba(15, 23, 42, 0.18);
+}
+.leyenda-estado-color--abierto {
+  background: #bbf7d0;
+}
+.leyenda-estado-color--proceso {
+  background: #fde68a;
+}
+.leyenda-estado-color--cerrado {
+  background: #fecaca;
 }
 .btn-proceso {
   border: 1px solid #d97706;
@@ -1822,6 +1914,32 @@ onUnmounted(() => {
   padding: 0;
   overflow: hidden;
   height: 260px;
+}
+.evidencia-adjunta {
+  padding: 0.65rem;
+  border: 1px solid rgba(0, 51, 204, 0.14);
+  border-radius: 12px;
+  background: #f8fbff;
+}
+.evidencia-link {
+  display: block;
+  margin-top: 0.35rem;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: #fff;
+}
+.evidencia-img {
+  display: block;
+  width: 100%;
+  max-height: 220px;
+  object-fit: contain;
+  background: #fff;
+}
+.evidencia-ayuda {
+  margin: 0.35rem 0 0;
+  font-size: 0.8rem;
+  color: var(--color-text-muted, #64748b);
 }
 .modal-title {
   font-size: 1.125rem;

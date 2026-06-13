@@ -16,7 +16,7 @@
       <template v-if="pasoActual === 1">
         <div class="grid-2">
           <div class="form-group">
-            <label>Numero planilla</label>
+            <label>Número planilla</label>
             <input v-model="form.numero_planilla" class="input" maxlength="50" @input="form.numero_planilla = sanitizarAlphaNumGuion(form.numero_planilla)" />
           </div>
           <div class="form-group">
@@ -28,7 +28,7 @@
             <input v-model="form.propetario" class="input" maxlength="100" @input="form.propetario = sanitizarLetras(form.propetario)" />
           </div>
           <div class="form-group">
-            <label>Cedula</label>
+            <label>Cédula</label>
             <input v-model="form.p_cedula" class="input" maxlength="20" @input="form.p_cedula = sanitizarNumeros(form.p_cedula, 20)" />
           </div>
           <div class="form-group">
@@ -36,7 +36,7 @@
             <input v-model.number="form.P_edad" type="number" min="0" max="130" class="input" />
           </div>
           <div class="form-group">
-            <label>Telefono</label>
+            <label>Teléfono</label>
             <input
               v-model="form.P_telefono"
               class="input"
@@ -94,7 +94,7 @@
             <input v-model="form.fecha_solicitud" type="datetime-local" class="input" />
           </div>
           <div class="form-group">
-            <label>Fecha afectacion</label>
+            <label>Fecha afectación</label>
             <input v-model="form.fecha_afectacion" type="datetime-local" class="input" />
           </div>
         </div>
@@ -103,11 +103,11 @@
       <template v-else-if="pasoActual === 4">
         <div class="grid-2">
           <div class="form-group">
-            <label>Tipo afectacion</label>
+            <label>Tipo afectación</label>
             <select v-model="form.tipo_afectacion" class="input">
               <option value="">Seleccione</option>
-              <option value="anegacion">Anegacion</option>
-              <option value="inundacion">Inundacion</option>
+              <option value="anegacion">Anegación</option>
+              <option value="inundacion">Inundación</option>
               <option value="deslizamiento">Deslizamiento</option>
               <option value="otros">Otros</option>
             </select>
@@ -131,15 +131,15 @@
             </select>
           </div>
           <div class="form-group" v-if="form.tipo_afectacion === 'otros'">
-            <label>Afectacion otros</label>
+            <label>Afectación otros</label>
             <input v-model="form.afectacion_otros" class="input" maxlength="255" />
           </div>
           <div class="form-group form-group-full">
-            <label>Descripcion de la afectacion</label>
+            <label>Descripción de la afectación</label>
             <textarea v-model="form.descripcion_afectacion" class="input" rows="3" maxlength="4000" />
           </div>
           <div class="form-group form-group-full">
-            <label>Descripcion de la vivienda</label>
+            <label>Descripción de la vivienda</label>
             <textarea v-model="form.descripcion_vivienda" class="input" rows="3" maxlength="4000" />
           </div>
         </div>
@@ -168,7 +168,7 @@
             <thead>
               <tr>
                 <th>Nombre y apellido</th>
-                <th>Cedula</th>
+                <th>Cédula</th>
                 <th>Edad</th>
                 <th>Sexo</th>
                 <th></th>
@@ -195,19 +195,19 @@
       <template v-else>
         <div class="grid-2">
           <div class="form-group form-group-full">
-            <label>Requerimientos por afectacion</label>
+            <label>Requerimientos por afectación</label>
             <textarea v-model="form.requerimientos_afectacion" class="input" rows="3" maxlength="4000" />
           </div>
           <div class="form-group">
-            <label>Perdidas de enseres total</label>
+            <label>Pérdidas de enseres total</label>
             <textarea v-model="form.P_enseres_total" class="input" rows="2" maxlength="4000" />
           </div>
           <div class="form-group">
-            <label>Perdidas de enseres parcial</label>
+            <label>Pérdidas de enseres parcial</label>
             <textarea v-model="form.P_enseres_parcial" class="input" rows="2" maxlength="4000" />
           </div>
           <div class="form-group">
-            <label>Sin perdidas de enseres</label>
+            <label>Sin pérdidas de enseres</label>
             <textarea v-model="form.p_enseres_no" class="input" rows="2" maxlength="4000" />
           </div>
           <div class="form-group">
@@ -287,10 +287,10 @@ const props = defineProps({
 const emit = defineEmits(['submit'])
 
 const PASOS = [
-  { id: 1, titulo: 'Datos de identificacion' },
-  { id: 2, titulo: 'Ubicacion' },
+  { id: 1, titulo: 'Datos de identificación' },
+  { id: 2, titulo: 'Ubicación' },
   { id: 3, titulo: 'Fechas' },
-  { id: 4, titulo: 'Afectacion y vivienda' },
+  { id: 4, titulo: 'Afectación y vivienda' },
   { id: 5, titulo: 'Personas afectadas' },
   { id: 6, titulo: 'Requerimientos y enseres' },
 ]
@@ -446,26 +446,26 @@ function validarCoords() {
 
 function validarPaso(idx) {
   if (idx === 1) {
-    if (isBlank(form.value.numero_planilla)) return 'Numero de planilla es obligatorio.'
+    if (isBlank(form.value.numero_planilla)) return 'Número de planilla es obligatorio.'
     if (!/^[A-Za-z0-9-]+$/.test(String(form.value.numero_planilla || '').trim())) {
-      return 'Numero de planilla solo admite letras, numeros y guion.'
+      return 'Número de planilla solo admite letras, números y guion.'
     }
     if (isBlank(form.value.nro_informe)) return 'Nro de informe es obligatorio.'
     if (!/^[A-Za-z0-9-]+$/.test(String(form.value.nro_informe || '').trim())) {
-      return 'Nro informe solo admite letras, numeros y guion.'
+      return 'Nro. informe solo admite letras, números y guion.'
     }
     if (isBlank(form.value.propetario)) return 'Propietario es obligatorio.'
     if (!tieneSoloLetras(form.value.propetario)) {
       return 'Propietario solo permite letras.'
     }
-    if (isBlank(form.value.p_cedula)) return 'Cedula es obligatoria.'
+    if (isBlank(form.value.p_cedula)) return 'Cédula es obligatoria.'
     if (!/^\d{6,20}$/.test(String(form.value.p_cedula || '').trim())) {
-      return 'Cedula debe ser numerica (6 a 20 digitos).'
+      return 'Cédula debe ser numérica (6 a 20 dígitos).'
     }
     if (!enteroValido(form.value.P_edad, 0, 130)) return 'Edad debe estar entre 0 y 130.'
-    if (isBlank(form.value.P_telefono)) return 'Telefono es obligatorio.'
+    if (isBlank(form.value.P_telefono)) return 'Teléfono es obligatorio.'
     if (!telefonoValido(form.value.P_telefono)) {
-      return 'Telefono debe tener formato 0414-1234567.'
+      return 'Teléfono debe tener formato 0414-1234567.'
     }
     return ''
   }
@@ -479,7 +479,7 @@ function validarPaso(idx) {
       return 'Urbanizacion solo permite letras.'
     }
     if (!isBlank(form.value.nro_casa) && !/^[A-Za-z0-9-]+$/.test(String(form.value.nro_casa || '').trim())) {
-      return 'Nro casa solo admite letras, numeros y guion.'
+      return 'Nro. casa solo admite letras, números y guion.'
     }
     if (isBlank(form.value.direccion)) return 'Direccion es obligatoria.'
     const errCoords = validarCoords()
@@ -488,18 +488,18 @@ function validarPaso(idx) {
   }
   if (idx === 3) {
     if (isBlank(form.value.fecha_solicitud)) return 'Fecha de solicitud es obligatoria.'
-    if (isBlank(form.value.fecha_afectacion)) return 'Fecha de afectacion es obligatoria.'
+    if (isBlank(form.value.fecha_afectacion)) return 'Fecha de afectación es obligatoria.'
     return ''
   }
   if (idx === 4) {
-    if (isBlank(form.value.tipo_afectacion)) return 'Seleccione tipo de afectacion.'
+    if (isBlank(form.value.tipo_afectacion)) return 'Seleccione tipo de afectación.'
     if (form.value.tipo_afectacion === 'otros' && isBlank(form.value.afectacion_otros)) {
-      return 'Debe describir afectacion en otros.'
+      return 'Debe describir afectación en otros.'
     }
     if (isBlank(form.value.condicion_vivienda)) return 'Seleccione condicion de vivienda.'
     if (isBlank(form.value.tipo_vivienda)) return 'Seleccione tipo de vivienda.'
-    if (isBlank(form.value.descripcion_afectacion)) return 'Descripcion de afectacion es obligatoria.'
-    if (isBlank(form.value.descripcion_vivienda)) return 'Descripcion de vivienda es obligatoria.'
+    if (isBlank(form.value.descripcion_afectacion)) return 'Descripción de afectación es obligatoria.'
+    if (isBlank(form.value.descripcion_vivienda)) return 'Descripción de vivienda es obligatoria.'
     return ''
   }
   if (idx === 5) {
@@ -537,16 +537,16 @@ function validarPaso(idx) {
       if (!nombre && !cedula) continue
       if (!nombre) return 'En detalle familiar, nombre y apellido es obligatorio.'
       if (!tieneSoloLetras(nombre)) return 'En detalle familiar, nombre y apellido solo permite letras.'
-      if (!/^\d{6,20}$/.test(cedula)) return 'En detalle familiar, cedula debe ser numerica (6 a 20 digitos).'
-      if (!enteroValido(f?.edad, 0, 130)) return 'En detalle familiar, edad debe ser valida (0 a 130).'
+      if (!/^\d{6,20}$/.test(cedula)) return 'En detalle familiar, cédula debe ser numérica (6 a 20 dígitos).'
+      if (!enteroValido(f?.edad, 0, 130)) return 'En detalle familiar, edad debe ser válida (0 a 130).'
     }
     return ''
   }
   if (idx === 6) {
-    if (isBlank(form.value.requerimientos_afectacion)) return 'Requerimientos por afectacion es obligatorio.'
-    if (isBlank(form.value.P_enseres_total)) return 'Perdidas de enseres total es obligatorio.'
-    if (isBlank(form.value.P_enseres_parcial)) return 'Perdidas de enseres parcial es obligatorio.'
-    if (isBlank(form.value.p_enseres_no)) return 'Sin perdidas de enseres es obligatorio.'
+    if (isBlank(form.value.requerimientos_afectacion)) return 'Requerimientos por afectación es obligatorio.'
+    if (isBlank(form.value.P_enseres_total)) return 'Pérdidas de enseres total es obligatorio.'
+    if (isBlank(form.value.P_enseres_parcial)) return 'Pérdidas de enseres parcial es obligatorio.'
+    if (isBlank(form.value.p_enseres_no)) return 'Sin pérdidas de enseres es obligatorio.'
     if (!['si', 'no'].includes(form.value.necesidades_agua)) return 'Seleccione si/no en necesidad de agua.'
     if (!['si', 'no'].includes(form.value.necesidades_alimentos)) return 'Seleccione si/no en necesidad de alimentos.'
     if (!['si', 'no'].includes(form.value.necesidades_luz)) return 'Seleccione si/no en necesidad de luz.'

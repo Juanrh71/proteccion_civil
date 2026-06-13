@@ -6,7 +6,9 @@
   "type": "module",
   "scripts": {
     "start": "node index.js",
-    "dev": "node --watch index.js"
+    "dev": "node --watch index.js",
+    "crear-admin": "node scripts/crearAdmin.js",
+    "seed-demo": "node scripts/seedDemoIncidentes.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

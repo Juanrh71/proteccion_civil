@@ -20,6 +20,7 @@
       </div>
 
       <p class="rs-label-semanas">Seleccione semanas a comparar (mínimo 2)</p>
+      <p class="rs-ayuda-cerrados">La comparativa semanal usa únicamente incidentes cerrados. Puede seleccionar todas las semanas que necesite comparar.</p>
       <div class="selector-semanas">
         <label v-for="w in semanasDelAnio" :key="`w-${w}`" class="selector-semana" :class="{ con_datos: semanasConIncidentes.includes(w) }">
           <input type="checkbox" :checked="semanasSeleccionadas.includes(w)" @change="toggleSemana(w)" />
@@ -52,18 +53,24 @@
     >
       <div class="tabla-semana-header">{{ sec.titulo }}</div>
       <div class="tabla-wrap">
-        <table class="tabla tabla-semana">
+        <table class="tabla tabla-semana" :style="estiloTablaSemanal">
+          <colgroup>
+            <col class="col-incidencia" />
+            <col v-for="s in datosReporte.semanas" :key="`col-${sec.id}-${s.semana}`" class="col-semana" />
+            <col v-if="datosReporte.semanas.length >= 2" class="col-pct" />
+            <col v-if="datosReporte.semanas.length >= 2" class="col-tend" />
+          </colgroup>
           <thead>
             <tr>
-              <th>Incidencia</th>
-              <th v-for="s in datosReporte.semanas" :key="`th-${sec.id}-${s.semana}`">{{ s.etiqueta }}</th>
-              <th v-if="datosReporte.semanas.length >= 2">%</th>
+              <th class="th-incidencia">Incidencia</th>
+              <th v-for="s in datosReporte.semanas" :key="`th-${sec.id}-${s.semana}`" class="th-semana">{{ s.etiqueta }}</th>
+              <th v-if="datosReporte.semanas.length >= 2" class="th-pct">%</th>
               <th v-if="datosReporte.semanas.length >= 2" class="th-tend">Tend.</th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="(fila, idx) in sec.filas" :key="`${sec.id}-f-${idx}`">
-              <td>{{ fila.nombre }}</td>
+              <td class="td-incidencia">{{ fila.nombre }}</td>
               <td v-for="(v, vi) in fila.valores" :key="`v-${vi}`" class="td-num">{{ String(v).padStart(2, '0') }}</td>
               <td v-if="datosReporte.semanas.length >= 2" class="td-pct" :class="clasePct(fila.pct)">
                 {{ formatoPorcentaje(fila.pct) }}
@@ -132,6 +139,14 @@ const semanasSeleccionadasOrdenadas = computed(() =>
 )
 
 const puedeGenerarPdf = computed(() => semanasSeleccionadasOrdenadas.value.length >= 2)
+
+const estiloTablaSemanal = computed(() => {
+  const semanas = datosReporte.value.semanas.length
+  const anchoIncidencia = 260
+  const anchoSemanas = semanas * 92
+  const anchoComparativa = semanas >= 2 ? 170 : 0
+  return { minWidth: `${anchoIncidencia + anchoSemanas + anchoComparativa}px` }
+})
 
 const datosReporte = computed(() => {
   if (!puedeGenerarPdf.value) {
@@ -226,6 +241,13 @@ function descargarPdf() {
   color: var(--color-text-muted);
 }
 
+.rs-ayuda-cerrados {
+  margin: -0.25rem 0 0.55rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #0f766e;
+}
+
 .selector-semanas {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(52px, 1fr));
@@ -297,6 +319,11 @@ function descargarPdf() {
   overflow: hidden;
 }
 
+.tabla-wrap {
+  overflow-x: auto;
+  width: 100%;
+}
+
 .tabla-semana-header {
   background: #ffe600;
   color: #b40000;
@@ -307,10 +334,60 @@ function descargarPdf() {
   letter-spacing: 0.03em;
 }
 
+.tabla-semana {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+}
+
+.col-incidencia {
+  width: 260px;
+}
+
+.col-semana {
+  width: 92px;
+}
+
+.col-pct {
+  width: 100px;
+}
+
+.col-tend {
+  width: 70px;
+}
+
 .tabla-semana th {
   background: #003378;
   color: #fff;
   text-align: center;
+  vertical-align: middle;
+  padding: 0.36rem 0.45rem;
+  white-space: nowrap;
+}
+
+.tabla-semana td {
+  vertical-align: middle;
+  padding: 0.34rem 0.45rem;
+}
+
+.th-incidencia,
+.td-incidencia {
+  text-align: left;
+}
+
+.td-incidencia {
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.th-semana,
+.td-num {
+  font-variant-numeric: tabular-nums;
+}
+
+.th-pct,
+.td-pct {
+  font-variant-numeric: tabular-nums;
 }
 
 .tabla-semana td.td-num,
@@ -337,7 +414,6 @@ function descargarPdf() {
 
 .th-tend,
 .td-tend {
-  width: 2.5rem;
   text-align: center;
 }
 

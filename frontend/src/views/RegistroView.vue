@@ -101,6 +101,21 @@
             </span>
             <span class="admin-menu-arrow" aria-hidden="true">&rarr;</span>
           </button>
+          <button type="button" class="admin-menu-card" @click="abrirPanel('auditoria')">
+            <span class="admin-menu-ico admin-menu-ico--catalog" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M9 11l3 3L22 4" />
+                <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+                <line x1="7" y1="8" x2="13" y2="8" />
+                <line x1="7" y1="17" x2="17" y2="17" />
+              </svg>
+            </span>
+            <span class="admin-menu-text">
+              <span class="admin-menu-title">Auditor&iacute;a de ediciones</span>
+              <span class="admin-menu-desc">Historial de cambios realizados sobre reportes de incidentes.</span>
+            </span>
+            <span class="admin-menu-arrow" aria-hidden="true">&rarr;</span>
+          </button>
           <button type="button" class="admin-menu-card" @click="abrirPanel('catalogo')">
             <span class="admin-menu-ico admin-menu-ico--catalog" aria-hidden="true">
               <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
@@ -347,6 +362,75 @@
             </template>
           </div>
 
+          <div v-else-if="panelAdmin === 'auditoria'" class="admin-surface admin-lista auditoria-panel">
+            <div class="lista-toolbar">
+              <span class="lista-toolbar-label">Ediciones registradas</span>
+              <button
+                type="button"
+                class="btn btn-acc btn-acc--approve"
+                :disabled="cargandoAuditoria"
+                @click="cargarAuditoriaEdiciones"
+              >
+                {{ cargandoAuditoria ? 'Cargando...' : 'Actualizar' }}
+              </button>
+            </div>
+            <p v-if="errorAuditoria" class="msg error msg-left admin-alert">{{ errorAuditoria }}</p>
+            <p
+              v-else-if="!cargandoAuditoria && !auditoriaEdiciones.length"
+              class="msg msg-muted msg-left admin-empty"
+            >
+              Todav&iacute;a no hay ediciones registradas sobre incidentes.
+            </p>
+            <p v-else-if="cargandoAuditoria" class="msg msg-muted msg-left admin-loading">Cargando auditor&iacute;a&hellip;</p>
+            <div v-else class="auditoria-lista">
+              <article
+                v-for="a in auditoriaEdiciones"
+                :key="a.id"
+                class="auditoria-card"
+              >
+                <div class="auditoria-card-head">
+                  <div>
+                    <strong>{{ nombreEditorAuditoria(a) }}</strong>
+                    <p class="auditoria-meta">
+                      C&eacute;dula: {{ a.usuario_cedula || '—' }} · Tel&eacute;fono: {{ a.usuario_telefono || '—' }}
+                    </p>
+                  </div>
+                  <span class="rol-tag rol-tag--oficial">{{ formatearFechaAdmin(a.fecha_edicion) }}</span>
+                </div>
+                <p class="auditoria-incidente">
+                  Reporte #{{ a.incidente_id }} · {{ a.incidente_tipo || 'Tipo no disponible' }}
+                  <span v-if="a.incidente_municipio"> · {{ a.incidente_municipio }}</span>
+                </p>
+                <div class="auditoria-cambios">
+                  <span
+                    v-for="campo in (a.campos_modificados || [])"
+                    :key="`${a.id}-${campo}`"
+                    class="kpi-chip"
+                  >
+                    {{ etiquetaCampoAuditoria(campo) }}
+                  </span>
+                </div>
+                <div class="auditoria-diff">
+                  <div
+                    v-for="campo in (a.campos_modificados || [])"
+                    :key="`${a.id}-diff-${campo}`"
+                    class="auditoria-diff-row"
+                  >
+                    <span class="auditoria-diff-campo">{{ etiquetaCampoAuditoria(campo) }}</span>
+                    <div class="auditoria-diff-val">
+                      <small>Antes</small>
+                      <p>{{ valorAuditoria(a.datos_antes, campo) }}</p>
+                    </div>
+                    <div class="auditoria-diff-val auditoria-diff-val--nuevo">
+                      <small>Ahora</small>
+                      <p>{{ valorAuditoria(a.datos_despues, campo) }}</p>
+                    </div>
+                  </div>
+                </div>
+              </article>
+            </div>
+          </div>
+
           <div v-else-if="panelAdmin === 'activos'" class="admin-surface admin-lista">
             <div class="lista-toolbar">
               <span class="lista-toolbar-label">Filtrar por estado</span>
@@ -358,6 +442,14 @@
                   @click="cambiarFiltroEstatus('activo')"
                 >
                   Activos
+                </button>
+                <button
+                  type="button"
+                  class="chip"
+                  :class="{ 'chip--on': filtroEstatus === 'pendiente' }"
+                  @click="cambiarFiltroEstatus('pendiente')"
+                >
+                  Pendientes
                 </button>
                 <button
                   type="button"
@@ -374,39 +466,10 @@
               v-else-if="!cargandoUsuarios && !usuarios.length"
               class="msg msg-muted msg-left admin-empty"
             >
-              No hay usuarios en esta lista.
+              {{ mensajeListaVacia }}
             </p>
             <p v-else-if="cargandoUsuarios" class="msg msg-muted msg-left admin-loading">Cargando usuarios&hellip;</p>
             <div v-else class="tabla-wrap">
-              <!-- Sub-panel para Restablecer Contraseña con Código -->
-              <div v-if="restablecerCorreo" class="admin-catalogo-block" style="margin-bottom: 1.5rem; border: 2px solid var(--color-accent); padding: 1rem; border-radius: var(--radius-lg); background-color: var(--color-white);">
-                <p class="admin-section-label" style="color: var(--color-accent); margin-top: 0;">Restablecer contraseña para: <strong>{{ restablecerCorreo }}</strong></p>
-                <p style="font-size: 0.85rem; margin-bottom: 0.75rem; color: var(--color-text-muted);">
-                  Se ha enviado un correo con el código de 6 dígitos al oficial. Ingrese el código recibido y la nueva contraseña aquí abajo.
-                </p>
-                <div class="admin-catalogo-form-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)) gap 1rem; align-items: flex-end;">
-                  <div class="form-group form-group-small" style="margin-bottom: 0;">
-                    <label>Código de 6 dígitos</label>
-                    <input v-model="restablecerForm.codigo" type="text" class="input input-small" placeholder="Ej: 123456" maxlength="6" />
-                  </div>
-                  <div class="form-group form-group-small" style="margin-bottom: 0;">
-                    <label>Nueva Contraseña</label>
-                    <input v-model="restablecerForm.password" type="password" class="input input-small" placeholder="Mínimo 6 caracteres" />
-                  </div>
-                  <div style="display: flex; gap: 0.5rem; margin-top: 1rem;">
-                    <button type="button" class="btn btn-primary admin-btn-primary btn-small" :disabled="procesandoRestablecer" @click="confirmarRestablecerClave">
-                      {{ procesandoRestablecer ? 'Guardando...' : 'Aplicar cambio' }}
-                    </button>
-                    <button type="button" class="btn btn-secondary btn-small" style="background-color: #64748b;" @click="cancelarRestablecer">
-                      Cancelar
-                    </button>
-                  </div>
-                </div>
-                <p v-if="restablecerMsg" :class="['msg', restablecerMsgOk ? 'ok' : 'error']" style="margin-top: 0.5rem; font-size: 0.9rem; text-align: left;">
-                  {{ restablecerMsg }}
-                </p>
-              </div>
-
               <table class="tabla-usuarios">
                 <thead>
                   <tr>
@@ -433,7 +496,16 @@
                     </td>
                     <td class="td-acc" style="display: flex; gap: 0.5rem; justify-content: flex-start; align-items: center; min-height: 48px;">
                       <button
-                        v-if="puedeBloquear(u)"
+                        v-if="puedeAprobar(u)"
+                        type="button"
+                        class="btn btn-acc btn-acc--approve"
+                        :disabled="procesandoId === u.id"
+                        @click="aprobarUsuario(u)"
+                      >
+                        {{ procesandoId === u.id ? '...' : 'Aprobar' }}
+                      </button>
+                      <button
+                        v-else-if="puedeBloquear(u)"
                         type="button"
                         class="btn btn-acc btn-acc--block"
                         :disabled="procesandoId === u.id"
@@ -450,19 +522,15 @@
                       >
                         {{ procesandoId === u.id ? '...' : 'Desbloquear' }}
                       </button>
-                      <span v-else class="td-acc-na" title="No aplica" style="display: inline-block; width: 60px; text-align: center;">—</span>
-
-                      <!-- Botón para Restablecer Clave (sólo oficiales y otros admins, no para ciudadanos o a sí mismo si no lo requiere) -->
                       <button
-                        v-if="u.rol !== 'ciudadano'"
+                        v-if="puedeVerMotivoBloqueo(u)"
                         type="button"
-                        class="btn btn-acc"
-                        style="background: linear-gradient(180deg, var(--color-orange), var(--color-orange-dark)); color: white; border-color: var(--color-orange-dark); box-shadow: 0 1px 4px rgba(255, 128, 0, 0.35);"
-                        :disabled="procesandoId === u.id || restablecerCorreo === u.correo"
-                        @click="iniciarRestablecerClave(u)"
+                        class="btn btn-acc btn-acc--reason"
+                        @click="verMotivoBloqueo(u)"
                       >
-                        {{ procesandoId === u.id && restablecerCorreo === u.correo ? 'Enviando...' : 'Restablecer Clave' }}
+                        Ver motivo
                       </button>
+                      <span v-if="!tieneAccionUsuario(u)" class="td-acc-na" title="No aplica" style="display: inline-block; width: 60px; text-align: center;">—</span>
                     </td>
                   </tr>
                 </tbody>
@@ -541,7 +609,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, watch } from 'vue'
+import { ref, reactive, computed, watch, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuth } from '../composables/useAuth'
 import { getUsuario } from '../api/auth'
@@ -552,6 +620,7 @@ import {
   postTipoCatalogo,
   patchTipoCatalogo,
 } from '../api/catalogo'
+import { listarAuditoriaIncidentes } from '../api/incidentes'
 import { cargarCatalogoIncidentes } from '../composables/useCatalogoIncidentes'
 
 const PREFIJOS_CEDULA = [
@@ -567,20 +636,36 @@ const { registro, listarUsuarios, cambiarEstatusUsuario } = useAuth()
 const esModoAdmin = route.path === '/usuarios'
 const me = computed(() => getUsuario())
 
-const panelAdmin = ref(null) // null | 'registrar' | 'activos' | 'catalogo'
+const panelAdmin = ref(null) // null | 'registrar' | 'activos' | 'catalogo' | 'auditoria'
 const filtroEstatus = ref('activo')
 const usuarios = ref([])
 const cargandoUsuarios = ref(false)
 const errorLista = ref('')
 const procesandoId = ref(null)
+const auditoriaEdiciones = ref([])
+const cargandoAuditoria = ref(false)
+const errorAuditoria = ref('')
+let intervaloPendientes = null
+let refrescandoPendientes = false
 
 const panelTitulo = computed(() => {
   if (panelAdmin.value === 'registrar') return 'Registrar usuario nuevo'
   if (panelAdmin.value === 'activos') {
+    if (filtroEstatus.value === 'pendiente') return 'Usuarios pendientes'
     return filtroEstatus.value === 'inactivo' ? 'Usuarios bloqueados' : 'Usuarios activos'
   }
+  if (panelAdmin.value === 'auditoria') return 'Auditoría de ediciones'
   if (panelAdmin.value === 'catalogo') return 'Catálogo de incidentes'
   return ''
+})
+const mensajeListaVacia = computed(() => {
+  if (filtroEstatus.value === 'pendiente') {
+    return 'No hay usuarios pendientes por aprobar.'
+  }
+  if (filtroEstatus.value === 'inactivo') {
+    return 'No hay usuarios bloqueados.'
+  }
+  return 'No hay usuarios activos.'
 })
 
 const catalogoAdmin = ref({ categorias: [] })
@@ -640,16 +725,6 @@ const mensajeGlobal = ref('')
 const mensajeOk = ref(false)
 const enviando = ref(false)
 
-// Estados para Restablecer Clave (Administrador)
-const restablecerCorreo = ref('')
-const restablecerForm = ref({
-  codigo: '',
-  password: ''
-})
-const restablecerMsg = ref('')
-const restablecerMsgOk = ref(false)
-const procesandoRestablecer = ref(false)
-
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const soloDigitos = /^\d+$/
 
@@ -658,8 +733,13 @@ function abrirPanel(panel) {
   panelAdmin.value = panel
   if (panel === 'activos') {
     cargarUsuarios()
+    actualizarMonitoreoPendientes()
   } else if (panel === 'catalogo') {
+    detenerMonitoreoPendientes()
     cargarCatalogoAdminData()
+  } else if (panel === 'auditoria') {
+    detenerMonitoreoPendientes()
+    cargarAuditoriaEdiciones()
   }
 }
 
@@ -805,22 +885,116 @@ function volverMenu() {
   panelAdmin.value = null
   errorLista.value = ''
   errorCatalogo.value = ''
+  errorAuditoria.value = ''
   procesandoId.value = null
+  detenerMonitoreoPendientes()
+}
+
+async function cargarAuditoriaEdiciones() {
+  errorAuditoria.value = ''
+  cargandoAuditoria.value = true
+  try {
+    const data = await listarAuditoriaIncidentes()
+    auditoriaEdiciones.value = Array.isArray(data) ? data : []
+  } catch (e) {
+    let msg = 'No se pudo cargar la auditoría de ediciones.'
+    if (e.response && e.response.data && e.response.data.error) {
+      msg = e.response.data.error
+    }
+    errorAuditoria.value = msg
+    auditoriaEdiciones.value = []
+  } finally {
+    cargandoAuditoria.value = false
+  }
+}
+
+function formatearFechaAdmin(fecha) {
+  if (!fecha) return '—'
+  const d = new Date(fecha)
+  if (Number.isNaN(d.getTime())) return '—'
+  return d.toLocaleString('es-VE', {
+    day: '2-digit',
+    month: '2-digit',
+    year: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+function nombreEditorAuditoria(item) {
+  const n = `${item?.usuario_nombre || ''} ${item?.usuario_apellido || ''}`.trim()
+  return n || 'Usuario no identificado'
+}
+
+const ETIQUETAS_AUDITORIA = {
+  tipo: 'Tipo',
+  tipo_nombre: 'Nombre del tipo',
+  categoria: 'Categoría',
+  descripcion: 'Descripción',
+  lat: 'Latitud',
+  lng: 'Longitud',
+  municipio: 'Municipio',
+  parroquia: 'Parroquia',
+  via: 'Calle / Avenida',
+}
+
+function etiquetaCampoAuditoria(campo) {
+  return ETIQUETAS_AUDITORIA[campo] || campo
+}
+
+function valorAuditoria(obj, campo) {
+  const v = obj && Object.prototype.hasOwnProperty.call(obj, campo) ? obj[campo] : null
+  if (v == null || v === '') return '—'
+  return String(v)
 }
 
 function cambiarFiltroEstatus(nuevo) {
   if (filtroEstatus.value === nuevo) return
   filtroEstatus.value = nuevo
+  usuarios.value = []
   if (panelAdmin.value === 'activos') {
     cargarUsuarios()
   }
+  actualizarMonitoreoPendientes()
 }
 
-async function cargarUsuarios() {
+function debeMonitorearPendientes() {
+  return esModoAdmin && panelAdmin.value === 'activos' && filtroEstatus.value === 'pendiente'
+}
+
+function actualizarMonitoreoPendientes() {
+  if (debeMonitorearPendientes()) {
+    iniciarMonitoreoPendientes()
+  } else {
+    detenerMonitoreoPendientes()
+  }
+}
+
+function iniciarMonitoreoPendientes() {
+  if (intervaloPendientes != null) return
+  intervaloPendientes = window.setInterval(() => {
+    if (!debeMonitorearPendientes() || refrescandoPendientes) return
+    cargarUsuarios({ silencioso: true })
+  }, 10000)
+}
+
+function detenerMonitoreoPendientes() {
+  if (intervaloPendientes == null) return
+  window.clearInterval(intervaloPendientes)
+  intervaloPendientes = null
+  refrescandoPendientes = false
+}
+
+async function cargarUsuarios(opciones = {}) {
   errorLista.value = ''
-  cargandoUsuarios.value = true
+  if (opciones.silencioso) {
+    refrescandoPendientes = true
+  } else {
+    cargandoUsuarios.value = true
+  }
   try {
-    usuarios.value = await listarUsuarios(filtroEstatus.value)
+    const lista = await listarUsuarios(filtroEstatus.value)
+    usuarios.value = filtrarUsuariosPorEstadoActual(Array.isArray(lista) ? lista : [])
   } catch (e) {
     let msg = 'No se pudo cargar la lista de usuarios.'
     if (e.response && e.response.data && e.response.data.error) {
@@ -829,8 +1003,22 @@ async function cargarUsuarios() {
     errorLista.value = msg
     usuarios.value = []
   } finally {
-    cargandoUsuarios.value = false
+    if (opciones.silencioso) {
+      refrescandoPendientes = false
+    } else {
+      cargandoUsuarios.value = false
+    }
   }
+}
+
+function filtrarUsuariosPorEstadoActual(lista) {
+  if (filtroEstatus.value === 'pendiente') {
+    return lista.filter((u) => u.estatus === 'pendiente')
+  }
+  if (filtroEstatus.value === 'inactivo') {
+    return lista.filter((u) => u.estatus === 'inactivo')
+  }
+  return lista.filter((u) => u.estatus === 'activo')
 }
 
 function esMismoUsuario(u) {
@@ -845,14 +1033,57 @@ function puedeDesbloquear(u) {
   return u.estatus === 'inactivo' && u.rol !== 'admin' && !esMismoUsuario(u)
 }
 
+function puedeVerMotivoBloqueo(u) {
+  return u.estatus === 'inactivo'
+}
+
+function tieneAccionUsuario(u) {
+  return puedeAprobar(u) || puedeBloquear(u) || puedeDesbloquear(u) || puedeVerMotivoBloqueo(u)
+}
+
+function puedeAprobar(u) {
+  return u.estatus === 'pendiente' && u.rol !== 'admin' && !esMismoUsuario(u)
+}
+
+async function aprobarUsuario(u) {
+  // eslint-disable-next-line no-alert
+  if (!window.confirm(`Seguro que desea aprobar el acceso de ${u.nombre} ${u.apellido}?`)) return
+  await actualizarEstatusUsuario(u, 'activo')
+}
+
 async function toggleBloqueo(u, estatus) {
   const accion = estatus === 'inactivo' ? 'bloquear' : 'desbloquear'
+  let motivoBloqueo = ''
+  if (estatus === 'inactivo') {
+    // eslint-disable-next-line no-alert
+    const motivo = window.prompt(`Indique brevemente por qué se bloquea a ${u.nombre} ${u.apellido}:`)
+    if (motivo == null) return
+    motivoBloqueo = motivo.trim()
+    if (!motivoBloqueo) {
+      errorLista.value = 'Debe indicar el motivo del bloqueo.'
+      return
+    }
+    if (motivoBloqueo.length > 1000) {
+      errorLista.value = 'El motivo del bloqueo no puede superar 1000 caracteres.'
+      return
+    }
+  }
   // eslint-disable-next-line no-alert
   if (!window.confirm(`Seguro que desea ${accion} a ${u.nombre} ${u.apellido}?`)) return
+  await actualizarEstatusUsuario(u, estatus, motivoBloqueo)
+}
+
+function verMotivoBloqueo(u) {
+  const motivo = String(u?.motivo_bloqueo || '').trim() || 'No se registró motivo de bloqueo.'
+  // eslint-disable-next-line no-alert
+  window.alert(`Motivo de bloqueo de ${u.nombre} ${u.apellido}:\n\n${motivo}`)
+}
+
+async function actualizarEstatusUsuario(u, estatus, motivoBloqueo = '') {
   procesandoId.value = u.id
   errorLista.value = ''
   try {
-    await cambiarEstatusUsuario(u.id, estatus)
+    await cambiarEstatusUsuario(u.id, estatus, motivoBloqueo)
     await cargarUsuarios()
   } catch (e) {
     let msg = 'No se pudo actualizar el usuario.'
@@ -865,82 +1096,12 @@ async function toggleBloqueo(u, estatus) {
   }
 }
 
-// FUNCIONES DE RESTABLECIMIENTO DE CLAVE DESDE VUE (ADMIN)
-import { solicitarCodigoRecuperacion, cambiarPasswordConCodigo } from '../api/auth'
-
-async function iniciarRestablecerClave(u) {
-  if (!window.confirm(`¿Enviar código de verificación al correo de ${u.nombre} ${u.apellido} (${u.correo}) para cambiar su clave?`)) return
-  procesandoId.value = u.id
-  restablecerMsg.value = ''
-  restablecerMsgOk.value = false
-  try {
-    const res = await solicitarCodigoRecuperacion(u.correo)
-    restablecerCorreo.value = u.correo
-    restablecerForm.value.codigo = ''
-    restablecerForm.value.password = ''
-    restablecerMsg.value = res.message || 'Código enviado con éxito.'
-    restablecerMsgOk.value = true
-  } catch (e) {
-    let msg = 'No se pudo enviar el código.'
-    if (e.response && e.response.data && e.response.data.error) {
-      msg = e.response.data.error
-    }
-    restablecerMsg.value = msg
-    restablecerMsgOk.value = false
-    restablecerCorreo.value = ''
-  } finally {
-    procesandoId.value = null
-  }
-}
-
-async function confirmarRestablecerClave() {
-  const f = restablecerForm.value
-  if (!f.codigo.trim() || f.codigo.trim().length !== 6) {
-    restablecerMsg.value = 'El código debe tener exactamente 6 dígitos.'
-    restablecerMsgOk.value = false
-    return
-  }
-  if (!f.password || f.password.length < 6) {
-    restablecerMsg.value = 'La nueva contraseña debe tener al menos 6 caracteres.'
-    restablecerMsgOk.value = false
-    return
-  }
-
-  procesandoRestablecer.value = true
-  restablecerMsg.value = ''
-  restablecerMsgOk.value = false
-  try {
-    const res = await cambiarPasswordConCodigo(restablecerCorreo.value, f.codigo, f.password)
-    restablecerMsg.value = res.message || 'Contraseña actualizada con éxito.'
-    restablecerMsgOk.value = true
-    setTimeout(() => {
-      cancelarRestablecer()
-    }, 3000)
-  } catch (e) {
-    let msg = 'No se pudo restablecer la contraseña.'
-    if (e.response && e.response.data && e.response.data.error) {
-      msg = e.response.data.error
-    }
-    restablecerMsg.value = msg
-    restablecerMsgOk.value = false
-  } finally {
-    procesandoRestablecer.value = false
-  }
-}
-
-function cancelarRestablecer() {
-  restablecerCorreo.value = ''
-  restablecerForm.value.codigo = ''
-  restablecerForm.value.password = ''
-  restablecerMsg.value = ''
-  restablecerMsgOk.value = false
-}
-
-
 watch(filtroEstatus, () => {
-  if (esModoAdmin && panelAdmin.value === 'activos') {
-    cargarUsuarios()
-  }
+  actualizarMonitoreoPendientes()
+})
+
+onUnmounted(() => {
+  detenerMonitoreoPendientes()
 })
 
 function validar() {
@@ -1754,6 +1915,16 @@ async function enviar() {
   background: var(--color-surface-card);
   border-color: var(--color-royal-blue);
 }
+.btn-acc--reason {
+  min-width: 5.8rem;
+  background: #fff7ed;
+  color: #9a3412;
+  border-color: #fed7aa;
+}
+.btn-acc--reason:hover:not(:disabled) {
+  background: #ffedd5;
+  border-color: #fb923c;
+}
 .tabla-wrap {
   width: 100%;
   overflow-x: auto;
@@ -1790,9 +1961,85 @@ async function enviar() {
 .tabla-usuarios tbody tr:hover {
   background: rgba(255, 128, 0, 0.06);
 }
+.auditoria-lista {
+  display: grid;
+  gap: 0.75rem;
+  max-height: 58vh;
+  overflow-y: auto;
+  padding: 0.15rem 0.15rem 0.35rem;
+}
+.auditoria-card {
+  border: 1px solid rgba(0, 51, 204, 0.12);
+  border-radius: 14px;
+  background: #fff;
+  padding: 0.85rem;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+}
+.auditoria-card-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  align-items: flex-start;
+}
+.auditoria-meta,
+.auditoria-incidente {
+  margin: 0.2rem 0 0;
+  color: var(--color-text-muted);
+  font-size: 0.82rem;
+}
+.auditoria-cambios {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: 0.65rem 0;
+}
+.auditoria-diff {
+  display: grid;
+  gap: 0.45rem;
+}
+.auditoria-diff-row {
+  display: grid;
+  grid-template-columns: 140px minmax(0, 1fr) minmax(0, 1fr);
+  gap: 0.5rem;
+  align-items: stretch;
+}
+.auditoria-diff-campo {
+  align-self: center;
+  color: #0033cc;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+.auditoria-diff-val {
+  min-width: 0;
+  padding: 0.45rem 0.55rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #f8fafc;
+}
+.auditoria-diff-val--nuevo {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+}
+.auditoria-diff-val small {
+  display: block;
+  margin-bottom: 0.2rem;
+  color: var(--color-text-muted);
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+.auditoria-diff-val p {
+  margin: 0;
+  color: #1f2937;
+  font-size: 0.84rem;
+  word-break: break-word;
+}
 @media (max-width: 900px) {
   .auth-view-admin {
     max-width: 100%;
+  }
+  .auditoria-diff-row {
+    grid-template-columns: 1fr;
   }
   .admin-menu {
     grid-template-columns: 1fr;

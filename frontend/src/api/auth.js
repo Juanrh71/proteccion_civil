@@ -55,8 +55,10 @@ export async function listarUsuarios(estatus = 'activo') {
   return data
 }
 
-export async function cambiarEstatusUsuario(id, estatus) {
-  const { data } = await api.patch(`/api/auth/usuarios/${id}/estatus`, { estatus })
+export async function cambiarEstatusUsuario(id, estatus, motivoBloqueo = '') {
+  const payload = { estatus }
+  if (motivoBloqueo) payload.motivo_bloqueo = motivoBloqueo
+  const { data } = await api.patch(`/api/auth/usuarios/${id}/estatus`, payload)
   return data
 }
 

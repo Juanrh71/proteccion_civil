@@ -91,14 +91,14 @@ function crearIcono(incidente) {
   const html =
     '<span style="background:' +
     color +
-    ';width:24px;height:24px;border-radius:50%;display:block;border:2px solid ' +
+    ';width:12px;height:12px;border-radius:50%;display:block;border:1px solid ' +
     borde +
-    ';box-shadow:0 1px 3px rgba(0,0,0,0.3)"></span>'
+    ';box-shadow:0 1px 2px rgba(0,0,0,0.28)"></span>'
   return L.divIcon({
     className: 'marker-incidente',
     html: html,
-    iconSize: [24, 24],
-    iconAnchor: [12, 12],
+    iconSize: [12, 12],
+    iconAnchor: [6, 6],
   })
 }
 

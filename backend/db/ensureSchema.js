@@ -243,6 +243,25 @@ export async function ensureIncidentesSchema() {
       )
     }
 
+    await pool.query(
+      `CREATE TABLE IF NOT EXISTS auditoria_incidentes (
+        id INT NOT NULL AUTO_INCREMENT,
+        incidente_id INT NOT NULL,
+        usuario_id INT DEFAULT NULL,
+        usuario_nombre VARCHAR(100) DEFAULT NULL,
+        usuario_apellido VARCHAR(100) DEFAULT NULL,
+        usuario_cedula VARCHAR(20) DEFAULT NULL,
+        usuario_telefono VARCHAR(20) DEFAULT NULL,
+        fecha_edicion DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        datos_antes LONGTEXT NOT NULL,
+        datos_despues LONGTEXT NOT NULL,
+        campos_modificados LONGTEXT NOT NULL,
+        PRIMARY KEY (id),
+        INDEX idx_auditoria_incidente (incidente_id),
+        INDEX idx_auditoria_fecha (fecha_edicion)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci`
+    )
+
     if (!(await hasColumn(dbName, 'usuarios', 'rol'))) {
       await pool.query(
         "ALTER TABLE usuarios ADD COLUMN rol ENUM('ciudadano', 'oficial', 'jefe_despacho', 'admin') NOT NULL DEFAULT 'ciudadano' AFTER telefono"
@@ -263,6 +282,13 @@ export async function ensureIncidentesSchema() {
       await pool.query(
         "ALTER TABLE usuarios MODIFY COLUMN estatus ENUM('pendiente', 'aprobado', 'bloqueado') NOT NULL DEFAULT 'pendiente'"
       )
+    }
+
+    if (!(await hasColumn(dbName, 'usuarios', 'motivo_bloqueo'))) {
+      await pool.query(
+        "ALTER TABLE usuarios ADD COLUMN motivo_bloqueo TEXT NULL AFTER estatus"
+      )
+      console.log('[db] Columna usuarios.motivo_bloqueo creada.')
     }
 
     if (!(await hasColumn(dbName, 'usuarios', 'codigo_recuperacion'))) {

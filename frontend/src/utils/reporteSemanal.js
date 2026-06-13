@@ -108,6 +108,54 @@ function sumaVictimas(lista, campo) {
 /** Filas alineadas al PowerPoint institucional. */
 export const SECCIONES_REPORTE_SEMANAL = [
   {
+    id: 'resumen_cerrados',
+    titulo: 'RESUMEN GENERAL DE INCIDENTES CERRADOS',
+    filas: [
+      { nombre: 'Total de incidentes cerrados', contar: (lista) => lista.length },
+      {
+        nombre: 'Hechos viales',
+        contar: (lista) => lista.filter((i) => esGrupo(i, 'hecho_vial')).length,
+      },
+      {
+        nombre: 'Incendios',
+        contar: (lista) => lista.filter((i) => esGrupo(i, 'incendio')).length,
+      },
+      {
+        nombre: 'Búsqueda y rescate',
+        contar: (lista) => lista.filter((i) => esGrupo(i, 'busqueda_rescate')).length,
+      },
+      {
+        nombre: 'Guardia de seguridad y prevención',
+        contar: (lista) => lista.filter((i) => esGrupo(i, 'guardia_seguridad_prevencion')).length,
+      },
+      {
+        nombre: 'Condición arbórea',
+        contar: (lista) => lista.filter((i) => esGrupo(i, 'condicion_arborea')).length,
+      },
+      {
+        nombre: 'Solicitud de traslado',
+        contar: (lista) => lista.filter((i) => esGrupo(i, 'solicitud_traslado')).length,
+      },
+      {
+        nombre: 'Clima e hidrometeorológico',
+        contar: (lista) =>
+          lista.filter((i) => ['clima', 'hidrometeorologico'].includes(grupoExcelDeIncidente(i))).length,
+      },
+      {
+        nombre: 'Colapso de estructura',
+        contar: (lista) => lista.filter((i) => esGrupo(i, 'colapso_estructura')).length,
+      },
+      {
+        nombre: 'Inspección y reubicación animal',
+        contar: (lista) => lista.filter((i) => esGrupo(i, 'inspeccion_reubicacion_animal')).length,
+      },
+      {
+        nombre: 'Eliminación de peligro',
+        contar: (lista) => lista.filter((i) => esGrupo(i, 'eliminacion_peligro')).length,
+      },
+    ],
+  },
+  {
     id: 'ambulancia',
     titulo: 'SERVICIOS DE AMBULANCIA',
     filas: [

@@ -83,21 +83,10 @@
     <section class="grid-charts">
       <div class="chart-toolbar dash-card">
         <div class="chart-toolbar-actions">
-          <button
-            type="button"
-            class="btn btn-primary btn-refrescar"
-            :disabled="refrescando"
-            @click="refrescarDatos"
-          >
-            {{ refrescando ? 'Actualizando…' : 'Refrescar' }}
-          </button>
-          <p v-if="ultimaActualizacionTexto" class="ultima-actualizacion">
-            Última actualización: {{ ultimaActualizacionTexto }}
-          </p>
         </div>
       </div>
       <div class="dash-card chart-panel">
-        <h2 class="chart-title">Por municipio</h2>
+        <h2 class="chart-title"> Incidentes por municipio</h2>
         <div class="chart-box">
           <Bar v-if="tieneBarrasMuni" :data="muniBarData" :options="barHorizontalOptions" />
           <p v-else class="chart-empty">Sin datos para el periodo y filtros seleccionados.</p>

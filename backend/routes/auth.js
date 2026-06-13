@@ -17,11 +17,21 @@ function estatusEsActivo(estatusRaw) {
   const est = String(estatusRaw || '')
     .trim()
     .toLowerCase()
-  return est === 'activo' || est === 'aprobado' || est === 'pendiente'
+  return est === 'activo' || est === 'aprobado' 
 }
 
-function estatusUiDesdeDb(estatusRaw) {
-  return estatusEsActivo(estatusRaw) ? 'activo' : 'inactivo'
+function estatusUiDesdeDb(estatusRaw, rolRaw = '') {
+  const est = String(estatusRaw || '')
+    .trim()
+    .toLowerCase()
+  const rol = String(rolRaw || '')
+    .trim()
+    .toLowerCase()
+  if (est === 'pendiente') return 'pendiente'
+  // Compatibilidad: algunos registros móviles antiguos quedaron como "inactivo".
+  // Esos usuarios aún no fueron bloqueados por un administrador, por eso deben aprobarse.
+  if (est === 'inactivo' && (rol === 'ciudadano' || rol === 'oficial')) return 'pendiente'
+  return estatusEsActivo(est) ? 'activo' : 'inactivo'
 }
 
 function authTokenDesdeHeader(req) {
@@ -146,19 +156,21 @@ router.get('/usuarios', requireAdmin, async (req, res) => {
   try {
     const estatus = String(req.query.estatus || 'activo').toLowerCase()
     let sql =
-      'SELECT id, nombre, apellido, correo, cedula, telefono, rol, estatus, created_at FROM usuarios'
+      'SELECT id, nombre, apellido, correo, cedula, telefono, rol, estatus, motivo_bloqueo, created_at FROM usuarios'
     const params = []
     if (estatus === 'activo') {
       sql += " WHERE estatus IN ('activo', 'aprobado')"
     } else if (estatus === 'inactivo') {
-      sql += " WHERE estatus IN ('inactivo', 'bloqueado', 'pendiente')"
+      sql += " WHERE estatus = 'bloqueado'"
+    } else if (estatus === 'pendiente') {
+      sql += " WHERE rol IN ('ciudadano', 'oficial') AND estatus IN ('pendiente', 'inactivo')"
     }
     sql += ' ORDER BY created_at DESC'
     const [rows] = await pool.query(sql, params)
     res.json(
       rows.map((u) => ({
         ...u,
-        estatus: estatusUiDesdeDb(u.estatus),
+        estatus: estatusUiDesdeDb(u.estatus, u.rol),
       }))
     )
   } catch (err) {
@@ -175,11 +187,21 @@ router.patch('/usuarios/:id/estatus', requireAdmin, async (req, res) => {
     if (estatus !== 'activo' && estatus !== 'inactivo') {
       return res.status(400).json({ error: 'Estatus inválido. Debe ser activo o inactivo.' })
     }
+    const motivoBloqueo = String(req.body.motivo_bloqueo || '').trim()
+    if (estatus === 'inactivo' && !motivoBloqueo) {
+      return res.status(400).json({ error: 'Debe indicar el motivo del bloqueo.' })
+    }
+    if (motivoBloqueo.length > 1000) {
+      return res.status(400).json({ error: 'El motivo del bloqueo no puede superar 1000 caracteres.' })
+    }
     if (id === req.authUser.id) {
       return res.status(400).json({ error: 'No puede cambiar su propio estatus.' })
     }
     const estatusDb = estatus === 'activo' ? 'aprobado' : 'bloqueado'
-    const [result] = await pool.query('UPDATE usuarios SET estatus = ? WHERE id = ?', [estatusDb, id])
+    const [result] = await pool.query(
+      'UPDATE usuarios SET estatus = ?, motivo_bloqueo = ? WHERE id = ?',
+      [estatusDb, estatus === 'inactivo' ? motivoBloqueo : null, id]
+    )
     if (result.affectedRows === 0) {
       return res.status(404).json({ error: 'Usuario no encontrado.' })
     }
@@ -314,7 +336,7 @@ router.post('/login', async (req, res) => {
         cedula: user.cedula,
         telefono: user.telefono,
         rol: user.rol,
-        estatus: estatusUiDesdeDb(user.estatus),
+        estatus: estatusUiDesdeDb(user.estatus, user.rol),
       },
     })
   } catch (err) {

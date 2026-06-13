@@ -2,7 +2,7 @@
   <footer class="footer">
     <div class="footer-inner">
       <p>
-        Instituto Autónomo del Sistema Integrado de Emergencias, Desastres y Apoyo a la Gestión de Riesgos del Estado Carabobo.
+        UJAP · Facultad de Ingeniería · Escuela de Ingeniería de Computación
       </p>
     </div>
   </footer>

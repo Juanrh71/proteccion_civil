@@ -32,9 +32,11 @@ CREATE TABLE IF NOT EXISTS usuarios (
   password_hash VARCHAR(255) NOT NULL,
   rol ENUM('ciudadano', 'oficial', 'jefe_despacho', 'admin') DEFAULT 'ciudadano',
   estatus ENUM('pendiente', 'aprobado', 'bloqueado') DEFAULT 'pendiente',
+  codigo_recuperacion VARCHAR(6) NULL,
+  expiracion_codigo DATETIME NULL,
+  
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
 CREATE TABLE IF NOT EXISTS incidentes (
   id INT AUTO_INCREMENT PRIMARY KEY,
   tipo VARCHAR(80) NOT NULL,

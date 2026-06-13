@@ -32,6 +32,9 @@ export async function obtenerIncidentes(options = {}) {
   }
   try {
     const { data } = await api.get('/api/incidentes', { params })
+    if (!Array.isArray(data)) {
+      throw new Error('Respuesta inválida del servidor al obtener incidentes.')
+    }
     return data
   } catch (e) {
     console.error('Error al obtener incidentes:', e?.response?.data || e?.message)
@@ -43,6 +46,17 @@ export async function obtenerIncidentes(options = {}) {
     err.response = e && e.response
     throw err
   }
+}
+
+export async function listarAuditoriaIncidentes() {
+  const { data } = await api.get('/api/incidentes/auditoria-ediciones')
+  return data
+}
+
+export function obtenerUrlEvidencia(nombreArchivo) {
+  const archivo = String(nombreArchivo || '').trim()
+  if (!archivo) return ''
+  return `${API_BASE.replace(/\/$/, '')}/uploads/evidencias/${encodeURIComponent(archivo)}`
 }
 
 function categoriaLeyendaParaApi(datos) {
