@@ -29,7 +29,21 @@
           </div>
           <div class="form-group">
             <label>Cédula</label>
-            <input v-model="form.p_cedula" class="input" maxlength="20" @input="form.p_cedula = sanitizarNumeros(form.p_cedula, 20)" />
+            <div class="cedula-row">
+              <select v-model="form.p_cedulaPrefijo" class="input input-prefijo">
+                <option value="">—</option>
+                <option v-for="p in PREFIJOS_CEDULA" :key="p.value" :value="p.value">{{ p.label }}</option>
+              </select>
+              <input
+                v-model="form.p_cedulaNumero"
+                type="text"
+                class="input input-numero"
+                inputmode="numeric"
+                maxlength="9"
+                placeholder="Número"
+                @input="form.p_cedulaNumero = sanitizarNumeros(form.p_cedulaNumero, 9)"
+              />
+            </div>
           </div>
           <div class="form-group">
             <label>Edad</label>
@@ -177,7 +191,22 @@
             <tbody>
               <tr v-for="(f, idx) in form.detalles_familiares" :key="idx">
                 <td><input v-model="f.nombre_completo" class="input input-sm" maxlength="150" @input="f.nombre_completo = sanitizarLetras(f.nombre_completo)" /></td>
-                <td><input v-model="f.cedula" class="input input-sm" maxlength="20" @input="f.cedula = sanitizarNumeros(f.cedula, 20)" /></td>
+                <td>
+                  <div class="cedula-row cedula-row--sm">
+                    <select v-model="f.cedulaPrefijo" class="input input-sm input-prefijo">
+                      <option value="">—</option>
+                      <option v-for="p in PREFIJOS_CEDULA" :key="p.value" :value="p.value">{{ p.label }}</option>
+                    </select>
+                    <input
+                      v-model="f.cedulaNumero"
+                      type="text"
+                      class="input input-sm input-numero"
+                      inputmode="numeric"
+                      maxlength="9"
+                      @input="f.cedulaNumero = sanitizarNumeros(f.cedulaNumero, 9)"
+                    />
+                  </div>
+                </td>
                 <td><input v-model.number="f.edad" type="number" min="0" max="130" class="input input-sm" /></td>
                 <td>
                   <select v-model="f.genero" class="input input-sm">
@@ -265,6 +294,13 @@
 import { computed, ref, watch } from 'vue'
 import { MAPA_BOUNDS_CARABOBO, MUNICIPIOS_CARABOBO } from '../config/incidentes'
 
+const PREFIJOS_CEDULA = [
+  { value: 'V', label: 'V' },
+  { value: 'E', label: 'E' },
+  { value: 'J', label: 'J' },
+]
+const CEDULA_REGEX = /^[VJE]\d{6,9}$/
+
 const props = defineProps({
   initialData: {
     type: Object,
@@ -304,7 +340,8 @@ function defaultForm() {
     id_oficial: null,
     numero_planilla: '',
     propetario: '',
-    p_cedula: '',
+    p_cedulaPrefijo: '',
+    p_cedulaNumero: '',
     P_edad: 0,
     P_telefono: '',
     municipio: '',
@@ -361,17 +398,26 @@ function fechaLocalInput(v) {
 function setDesdeInicial(data) {
   const base = defaultForm()
   const x = data || {}
+  const parsedPropietario = parseCedula(x.p_cedula)
   form.value = {
     ...base,
     ...x,
+    p_cedulaPrefijo: parsedPropietario.prefijo,
+    p_cedulaNumero: parsedPropietario.numero,
     fecha_solicitud: fechaLocalInput(x.fecha_solicitud),
     fecha_afectacion: fechaLocalInput(x.fecha_afectacion),
-    detalles_familiares: Array.isArray(x.detalles_familiares) ? x.detalles_familiares.map((d) => ({
-      nombre_completo: String(d?.nombre_completo || ''),
-      cedula: String(d?.cedula || ''),
-      edad: Number.isFinite(Number(d?.edad)) ? Number(d.edad) : 0,
-      genero: String(d?.genero || '').trim() === 'Femenino' ? 'Femenino' : 'Masculino',
-    })) : [],
+    detalles_familiares: Array.isArray(x.detalles_familiares)
+      ? x.detalles_familiares.map((d) => {
+          const parsed = parseCedula(d?.cedula)
+          return {
+            nombre_completo: String(d?.nombre_completo || ''),
+            cedulaPrefijo: parsed.prefijo,
+            cedulaNumero: parsed.numero,
+            edad: Number.isFinite(Number(d?.edad)) ? Number(d.edad) : 0,
+            genero: String(d?.genero || '').trim() === 'Femenino' ? 'Femenino' : 'Masculino',
+          }
+        })
+      : [],
   }
 }
 
@@ -403,6 +449,29 @@ function sanitizarNumeros(v, maxLen = 20) {
   return String(v || '')
     .replace(/\D/g, '')
     .slice(0, maxLen)
+}
+
+function parseCedula(cedula) {
+  const c = String(cedula || '').replace(/\s/g, '').toUpperCase()
+  const conPrefijo = c.match(/^([VJE])(\d+)$/)
+  if (conPrefijo) {
+    return { prefijo: conPrefijo[1], numero: conPrefijo[2].slice(0, 9) }
+  }
+  if (/^\d+$/.test(c)) {
+    return { prefijo: 'V', numero: c.slice(0, 9) }
+  }
+  return { prefijo: '', numero: '' }
+}
+
+function formatCedula(prefijo, numero) {
+  const p = String(prefijo || '').trim().toUpperCase()
+  const n = sanitizarNumeros(numero, 9)
+  if (!p || !n) return ''
+  return `${p}${n}`
+}
+
+function cedulaValida(prefijo, numero) {
+  return CEDULA_REGEX.test(formatCedula(prefijo, numero))
 }
 
 function sanitizarAlphaNumGuion(v) {
@@ -469,9 +538,11 @@ function validarPaso(idx) {
     if (!tieneSoloLetras(form.value.propetario)) {
       return 'Propietario solo permite letras.'
     }
-    if (isBlank(form.value.p_cedula)) return 'Cédula es obligatoria.'
-    if (!/^\d{6,20}$/.test(String(form.value.p_cedula || '').trim())) {
-      return 'Cédula debe ser numérica (6 a 20 dígitos).'
+    if (isBlank(form.value.p_cedulaPrefijo) || isBlank(form.value.p_cedulaNumero)) {
+      return 'Cédula es obligatoria (prefijo V, E o J y número).'
+    }
+    if (!cedulaValida(form.value.p_cedulaPrefijo, form.value.p_cedulaNumero)) {
+      return 'Cédula debe ser V, E o J seguido de 6 a 9 dígitos.'
     }
     if (!enteroValido(form.value.P_edad, 0, 130)) return 'Edad debe estar entre 0 y 130.'
     if (isBlank(form.value.P_telefono)) return 'Teléfono es obligatorio.'
@@ -565,11 +636,14 @@ function validarPaso(idx) {
     }
     for (const f of form.value.detalles_familiares) {
       const nombre = String(f?.nombre_completo || '').trim()
-      const cedula = String(f?.cedula || '').trim()
       if (!nombre) return 'En detalle familiar, nombre y apellido es obligatorio.'
       if (!tieneSoloLetras(nombre)) return 'En detalle familiar, nombre y apellido solo permite letras.'
-      if (!cedula) return 'En detalle familiar, cédula es obligatoria.'
-      if (!/^\d{6,20}$/.test(cedula)) return 'En detalle familiar, cédula debe ser numérica (6 a 20 dígitos).'
+      if (isBlank(f?.cedulaPrefijo) || isBlank(f?.cedulaNumero)) {
+        return 'En detalle familiar, cédula es obligatoria (prefijo V, E o J y número).'
+      }
+      if (!cedulaValida(f.cedulaPrefijo, f.cedulaNumero)) {
+        return 'En detalle familiar, cédula debe ser V, E o J seguido de 6 a 9 dígitos.'
+      }
       if (!enteroValido(f?.edad, 0, 130)) return 'En detalle familiar, edad debe ser válida (0 a 130).'
       if (!['Femenino', 'Masculino'].includes(String(f?.genero || ''))) {
         return 'En detalle familiar, sexo debe ser Femenino o Masculino.'
@@ -609,7 +683,8 @@ function pasoAnterior() {
 function agregarDetalle() {
   form.value.detalles_familiares.push({
     nombre_completo: '',
-    cedula: '',
+    cedulaPrefijo: '',
+    cedulaNumero: '',
     edad: 0,
     genero: 'Masculino',
   })
@@ -619,11 +694,26 @@ function eliminarDetalle(idx) {
   form.value.detalles_familiares.splice(idx, 1)
 }
 
-const payload = computed(() => ({
-  ...form.value,
-  fecha_solicitud: form.value.fecha_solicitud ? new Date(form.value.fecha_solicitud).toISOString() : null,
-  fecha_afectacion: form.value.fecha_afectacion ? new Date(form.value.fecha_afectacion).toISOString() : null,
-}))
+const payload = computed(() => {
+  const {
+    p_cedulaPrefijo,
+    p_cedulaNumero,
+    detalles_familiares: detallesRaw,
+    ...resto
+  } = form.value
+  return {
+    ...resto,
+    p_cedula: formatCedula(p_cedulaPrefijo, p_cedulaNumero),
+    detalles_familiares: (detallesRaw || []).map((f) => ({
+      nombre_completo: f.nombre_completo,
+      cedula: formatCedula(f.cedulaPrefijo, f.cedulaNumero),
+      edad: f.edad,
+      genero: f.genero,
+    })),
+    fecha_solicitud: form.value.fecha_solicitud ? new Date(form.value.fecha_solicitud).toISOString() : null,
+    fecha_afectacion: form.value.fecha_afectacion ? new Date(form.value.fecha_afectacion).toISOString() : null,
+  }
+})
 
 function enviar() {
   mostrarErrorPasoActual.value = true
@@ -692,6 +782,23 @@ function enviar() {
 }
 .form-group-full {
   grid-column: 1 / -1;
+}
+.cedula-row {
+  display: flex;
+  gap: 0.35rem;
+}
+.cedula-row--sm {
+  min-width: 9rem;
+}
+.input-prefijo {
+  flex: 0 0 auto;
+  width: 2.75rem;
+  padding-left: 0.35rem;
+  padding-right: 0.35rem;
+}
+.input-numero {
+  flex: 1;
+  min-width: 0;
 }
 .detalle-toolbar {
   margin-top: 0.7rem;

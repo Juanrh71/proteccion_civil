@@ -33,6 +33,7 @@ const SOLO_LETRAS = /^[A-Za-zÁÉÍÓÚáéíóúÑñÜü\s.'-]+$/
 const ALFANUM_GUION = /^[A-Za-z0-9-]+$/
 const TEXTO_GENERAL = /^[A-Za-z0-9ÁÉÍÓÚáéíóúÑñÜü\s.,#°º/-]+$/
 const TELEFONO_VENEZOLANO = /^04\d{2}-\d{7}$/
+const CEDULA_VENEZOLANA = /^[VJE]\d{6,9}$/
 const SELECT_EDAN = `
   id, id_oficial, fecha_reporte, numero_planilla, propetario, p_cedula, P_edad, P_telefono,
   municipio, parroquia, sector, nro_casa, urbanizacion, direccion, lat, lng, nro_informe,
@@ -120,6 +121,15 @@ function validarPatron(t, campo, patron, mensaje) {
   return t
 }
 
+function normalizarCedula(v, campo = 'cédula') {
+  let c = String(v || '').replace(/\s/g, '').toUpperCase()
+  if (/^\d{6,9}$/.test(c)) c = `V${c}`
+  if (!CEDULA_VENEZOLANA.test(c)) {
+    throw new Error(`${campo} debe ser V, E o J seguido de 6 a 9 dígitos.`)
+  }
+  return c
+}
+
 function textoOpcional(v, maxLen = 255) {
   const t = String(v || '').trim()
   if (!t) return null
@@ -192,12 +202,9 @@ function normalizarDetallesFamiliares(arr) {
   const out = []
   for (const it of arr) {
     const nombre = String(it?.nombre_completo || '').trim()
-    const cedula = String(it?.cedula || '').trim()
     if (!nombre) throw new Error('El nombre del afectado es obligatorio.')
     validarPatron(nombre, 'nombre_completo', SOLO_LETRAS, 'El nombre del afectado solo permite letras.')
-    if (!/^\d{6,20}$/.test(cedula)) {
-      throw new Error('La cédula del afectado debe ser numérica y tener entre 6 y 20 dígitos.')
-    }
+    const cedula = normalizarCedula(it?.cedula, 'La cédula del afectado')
     const edad = enteroNoNegativo(it?.edad ?? 0, 'edad de detalle familiar', 130)
     const generoBase = String(it?.genero || '').trim().toLowerCase()
     if (!['femenino', 'masculino'].includes(generoBase)) {
@@ -251,8 +258,7 @@ function validarYNormalizarPayload(d, { requiereIdOficial }) {
   validarPatron(nro_informe, 'nro_informe', ALFANUM_GUION, 'Nro. informe solo admite letras, números y guion.')
   const propetario = textoRequerido(d?.propetario, 'propetario', 100)
   validarPatron(propetario, 'propetario', SOLO_LETRAS, 'Propietario solo permite letras.')
-  const p_cedula = textoRequerido(d?.p_cedula, 'p_cedula', 20)
-  if (!/^\d{6,20}$/.test(p_cedula)) throw new Error('Cédula debe ser numérica y tener entre 6 y 20 dígitos.')
+  const p_cedula = normalizarCedula(textoRequerido(d?.p_cedula, 'p_cedula', 20), 'Cédula')
   const P_telefono = textoRequerido(d?.P_telefono, 'P_telefono', 20)
   validarPatron(P_telefono, 'P_telefono', TELEFONO_VENEZOLANO, 'Teléfono debe tener formato 0414-1234567.')
   const parroquia = textoRequerido(d?.parroquia, 'parroquia', 100)
