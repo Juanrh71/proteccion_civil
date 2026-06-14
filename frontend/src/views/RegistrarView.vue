@@ -147,6 +147,7 @@
 
     <section v-else class="card edan-panel">
       <EdanWizard
+        v-if="!edanUltimoRegistro"
         :key="edanResetKey"
         :initial-data="edanFormInicial"
         :submitting="enviandoEdan"
@@ -154,8 +155,35 @@
         submit-label="Registrar EDAN"
         @submit="enviarEdan"
       />
-      <p v-if="mensajeEdan" :class="mensajeEdanOk ? 'msg ok' : 'msg error'">{{ mensajeEdan }}</p>
+
+      <div v-else class="edan-registro-exito">
+        <p class="msg ok">
+          Formulario EDAN registrado correctamente.
+          <strong v-if="edanUltimoRegistro.id">N° {{ edanUltimoRegistro.id }}</strong>
+        </p>
+        <div class="edan-post-acciones">
+          <button type="button" class="btn btn-primary" @click="previewEdanVisible = true">
+            Ver vista previa
+          </button>
+          <button type="button" class="btn btn-secondary" :disabled="descargandoPdfEdan" @click="descargarPdfEdan">
+            {{ descargandoPdfEdan ? 'Generando PDF…' : 'Descargar PDF' }}
+          </button>
+          <button type="button" class="btn btn-secondary" @click="nuevoEdanRegistro">
+            Registrar otro EDAN
+          </button>
+        </div>
+      </div>
+
+      <p v-if="mensajeEdan && !edanUltimoRegistro" :class="mensajeEdanOk ? 'msg ok' : 'msg error'">{{ mensajeEdan }}</p>
     </section>
+
+    <EdanFormularioPreview
+      :visible="previewEdanVisible"
+      :data="edanUltimoRegistro"
+      :descargando="descargandoPdfEdan"
+      @close="previewEdanVisible = false"
+      @descargar-pdf="descargarPdfEdan"
+    />
   </div>
 </template>
 
@@ -163,6 +191,7 @@
 import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import MapaCarabobo from '../components/MapaCarabobo.vue'
 import EdanWizard from '../components/EdanWizard.vue'
+import EdanFormularioPreview from '../components/EdanFormularioPreview.vue'
 import {
   TIPOS_INCIDENTE,
   MUNICIPIOS_CARABOBO,
@@ -178,6 +207,7 @@ import {
 import { useCatalogoIncidentes } from '../composables/useCatalogoIncidentes'
 import { guardarIncidente } from '../api/incidentes'
 import { registrarEdan } from '../api/edan.js'
+import { descargarPdfEdanFormulario } from '../utils/pdfEdanFormulario.js'
 import { getUsuario } from '../api/auth.js'
 import { obtenerUbicacionInversa } from '../api/geocoding.js'
 
@@ -188,6 +218,10 @@ const enviandoEdan = ref(false)
 const mensajeEdan = ref('')
 const mensajeEdanOk = ref(false)
 const edanResetKey = ref(0)
+const edanUltimoRegistro = ref(null)
+const previewEdanVisible = ref(false)
+const descargandoPdfEdan = ref(false)
+const logoPdfEdanDataUrl = ref(null)
 
 const edanFormInicial = computed(() => ({
   numero_planilla: '',
@@ -470,6 +504,17 @@ const parroquiasDisponibles = computed(() => {
 onMounted(() => {
   actualizarRelojVista()
   relojIntervalId = setInterval(actualizarRelojVista, 1000)
+  cargarLogoPdfEdan().then((url) => {
+    logoPdfEdanDataUrl.value = url
+  })
+})
+
+watch(vistaRegistro, (v) => {
+  if (v !== 'edan') {
+    edanUltimoRegistro.value = null
+    previewEdanVisible.value = false
+    mensajeEdan.value = ''
+  }
 })
 
 onUnmounted(() => {
@@ -678,7 +723,52 @@ async function enviar() {
 function limpiarEdan() {
   mensajeEdan.value = ''
   mensajeEdanOk.value = false
+  edanUltimoRegistro.value = null
+  previewEdanVisible.value = false
   edanResetKey.value += 1
+}
+
+function nuevoEdanRegistro() {
+  limpiarEdan()
+}
+
+function cargarLogoPdfEdan() {
+  return new Promise((resolve) => {
+    const img = new Image()
+    img.onload = () => {
+      try {
+        const canvas = document.createElement('canvas')
+        canvas.width = img.width
+        canvas.height = img.height
+        const ctx = canvas.getContext('2d')
+        if (!ctx) {
+          resolve(null)
+          return
+        }
+        ctx.drawImage(img, 0, 0)
+        resolve(canvas.toDataURL('image/png'))
+      } catch {
+        resolve(null)
+      }
+    }
+    img.onerror = () => resolve(null)
+    img.src = '/imagenes/logo.png'
+  })
+}
+
+function descargarPdfEdan() {
+  if (!edanUltimoRegistro.value) return
+  descargandoPdfEdan.value = true
+  try {
+    descargarPdfEdanFormulario({
+      data: edanUltimoRegistro.value,
+      logoDataUrl: logoPdfEdanDataUrl.value,
+    })
+  } catch {
+    alert('No se pudo generar el PDF. Intente de nuevo.')
+  } finally {
+    descargandoPdfEdan.value = false
+  }
 }
 
 async function enviarEdan(payload) {
@@ -691,14 +781,19 @@ async function enviarEdan(payload) {
   }
   enviandoEdan.value = true
   mensajeEdan.value = ''
+  previewEdanVisible.value = false
   try {
-    await registrarEdan({
+    const resp = await registrarEdan({
       ...payload,
       id_oficial: idOficial,
     })
-    mensajeEdan.value = 'Formulario EDAN registrado correctamente.'
+    edanUltimoRegistro.value = {
+      ...payload,
+      id: resp?.id ?? null,
+      fecha_reporte: new Date().toISOString(),
+    }
+    mensajeEdan.value = ''
     mensajeEdanOk.value = true
-    edanResetKey.value += 1
   } catch (e) {
     let msg = 'Error al registrar EDAN.'
     if (e?.response?.data?.error) msg = e.response.data.error
@@ -744,6 +839,20 @@ async function enviarEdan(payload) {
 }
 .edan-panel {
   padding: 0.75rem;
+}
+.edan-registro-exito {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  padding: 0.35rem 0.15rem 0.15rem;
+}
+.edan-registro-exito .msg {
+  margin: 0;
+}
+.edan-post-acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
 }
 .form-registro {
   flex: 1;

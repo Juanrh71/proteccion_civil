@@ -339,7 +339,7 @@
               <th>Parroquia</th>
               <th>Afectación</th>
               <th>Total personas</th>
-              <th class="th-acc">Acc.</th>
+              <th class="th-acc th-acc--edan">Acc.</th>
             </tr>
           </thead>
           <tbody>
@@ -352,7 +352,29 @@
               <td>{{ e.parroquia || '-' }}</td>
               <td>{{ e.tipo_afectacion || '-' }}</td>
               <td>{{ e.total_personas ?? 0 }}</td>
-              <td class="acciones-cell">
+              <td class="acciones-cell acciones-cell--edan">
+                <button
+                  type="button"
+                  class="btn btn-icon btn-icon--ver"
+                  title="Vista previa e imprimir"
+                  :disabled="cargandoPreviewEdanId === e.id"
+                  @click="abrirPreviewEdan(e)"
+                >
+                  <svg class="btn-icon-svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <path fill="currentColor" d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z" />
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  class="btn btn-icon btn-icon--pdf"
+                  title="Descargar PDF"
+                  :disabled="descargandoPdfEdanId === e.id"
+                  @click="descargarPdfEdan(e)"
+                >
+                  <svg class="btn-icon-svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <path fill="currentColor" d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 2.5L18.5 9H13V4.5zM8 13h1.5v5H8v-5zm3.25 0H13c.97 0 1.75.72 1.75 1.6v1.8c0 .88-.78 1.6-1.75 1.6h-1.75v-5zm1.5 3.2v-1.6H13c.14 0 .25.1.25.22v1.16c0 .12-.11.22-.25.22h-.25zm4-3.2h2.1l-1.3 2.1 1.35 2.9H16.8l-.85-1.9-.85 1.9h-2.1l1.35-2.9-1.3-2.1h2.1l.55 1.2.55-1.2z" />
+                  </svg>
+                </button>
                 <button type="button" class="btn btn-icon btn-icon--editar" title="Editar EDAN" @click="abrirEditarEdan(e)">
                   <svg class="btn-icon-svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
                     <path fill="currentColor" d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1.003 1.003 0 0 0 0-1.42l-2.34-2.34a1.003 1.003 0 0 0-1.42 0l-1.83 1.83 3.75 3.75 1.84-1.82z" />
@@ -581,6 +603,13 @@
         />
       </div>
     </div>
+    <EdanFormularioPreview
+      :visible="previewEdanVisible"
+      :data="edanPreviewData"
+      :descargando="descargandoPdfEdanId != null"
+      @close="cerrarPreviewEdan"
+      @descargar-pdf="descargarPdfEdanDesdePreview"
+    />
   </div>
 </template>
 
@@ -588,6 +617,7 @@
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import MapaCarabobo from '../components/MapaCarabobo.vue'
 import EdanWizard from '../components/EdanWizard.vue'
+import EdanFormularioPreview from '../components/EdanFormularioPreview.vue'
 import {
   obtenerIncidentes,
   actualizarIncidente,
@@ -606,6 +636,7 @@ import {
   tieneRegistroVictimasCierre,
 } from '../utils/resultadoIncidente.js'
 import { actualizarEdan, listarEdan, obtenerEdanPorId } from '../api/edan.js'
+import { descargarPdfEdanFormulario } from '../utils/pdfEdanFormulario.js'
 
 const { categorias, tiposPlano } = useCatalogoIncidentes()
 
@@ -675,6 +706,10 @@ const mostrarModalEdan = ref(false)
 const guardandoEdan = ref(false)
 const edanEditData = ref({})
 const edanEditId = ref(null)
+const edanPreviewData = ref(null)
+const previewEdanVisible = ref(false)
+const cargandoPreviewEdanId = ref(null)
+const descargandoPdfEdanId = ref(null)
 
 const formEditar = ref({
   municipio: '',
@@ -1093,11 +1128,67 @@ async function cargarEdanLista() {
   }
 }
 
+async function cargarEdanCompleto(id) {
+  const data = await obtenerEdanPorId(id)
+  return data || {}
+}
+
+async function abrirPreviewEdan(row) {
+  if (!row?.id) return
+  cargandoPreviewEdanId.value = row.id
+  try {
+    edanPreviewData.value = await cargarEdanCompleto(row.id)
+    previewEdanVisible.value = true
+  } catch (e) {
+    const msg = e?.response?.data?.error || e?.message || 'No se pudo cargar la vista previa del EDAN.'
+    alert(msg)
+  } finally {
+    cargandoPreviewEdanId.value = null
+  }
+}
+
+function cerrarPreviewEdan() {
+  previewEdanVisible.value = false
+  edanPreviewData.value = null
+}
+
+async function descargarPdfEdan(row) {
+  if (!row?.id) return
+  descargandoPdfEdanId.value = row.id
+  try {
+    const data = edanPreviewData.value?.id === row.id ? edanPreviewData.value : await cargarEdanCompleto(row.id)
+    descargarPdfEdanFormulario({
+      data,
+      logoDataUrl: logoPdfDataUrl.value,
+    })
+  } catch (e) {
+    const msg = e?.response?.data?.error || e?.message || 'No se pudo generar el PDF.'
+    alert(msg)
+  } finally {
+    descargandoPdfEdanId.value = null
+  }
+}
+
+function descargarPdfEdanDesdePreview() {
+  if (!edanPreviewData.value?.id) return
+  descargandoPdfEdanId.value = edanPreviewData.value.id
+  try {
+    descargarPdfEdanFormulario({
+      data: edanPreviewData.value,
+      logoDataUrl: logoPdfDataUrl.value,
+    })
+  } catch {
+    alert('No se pudo generar el PDF.')
+  } finally {
+    descargandoPdfEdanId.value = null
+  }
+}
+
 async function abrirEditarEdan(row) {
   if (!row?.id) return
   try {
-    const data = await obtenerEdanPorId(row.id)
-    edanEditData.value = data || {}
+    const data = await cargarEdanCompleto(row.id)
+    edanEditData.value = data
     edanEditId.value = row.id
     mostrarModalEdan.value = true
   } catch (e) {
@@ -1478,6 +1569,16 @@ onUnmounted(() => {
   width: 3.1rem;
   text-align: center !important;
 }
+.th-acc--edan {
+  width: 6.5rem;
+}
+.acciones-cell--edan {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 0.2rem;
+  justify-content: center;
+  align-items: center;
+}
 .td-fecha {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -1627,6 +1728,28 @@ onUnmounted(() => {
   background: #bae6fd;
   border-color: #38bdf8;
   color: #0c4a6e;
+}
+.btn-icon--ver {
+  background: #eef2ff;
+  color: #3730a3;
+  border: 1px solid #a5b4fc;
+  box-shadow: 0 1px 0 rgba(55, 48, 163, 0.08);
+}
+.btn-icon--ver:hover:not(:disabled) {
+  background: #e0e7ff;
+  border-color: #818cf8;
+  color: #312e81;
+}
+.btn-icon--pdf {
+  background: #ecfdf5;
+  color: #047857;
+  border: 1px solid #6ee7b7;
+  box-shadow: 0 1px 0 rgba(4, 120, 87, 0.08);
+}
+.btn-icon--pdf:hover:not(:disabled) {
+  background: #d1fae5;
+  border-color: #34d399;
+  color: #065f46;
 }
 .btn-icon--proceso {
   border: 1px solid #fb923c;
