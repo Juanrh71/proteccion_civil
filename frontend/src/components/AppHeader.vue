@@ -1,10 +1,13 @@
 <template>
   <header class="header">
     <div class="header-inner">
-      <router-link to="/" class="logo">
-        <img src="/imagenes/logo.png" alt="Protección Civil y Administración de Desastres" class="logo-img" width="52" height="52" />
-        <span class="logo-text">IASIEDAGREC</span>
-      </router-link>
+      <div class="header-brand">
+        <router-link to="/" class="logo">
+          <img src="/imagenes/logo.png" alt="Protección Civil y Administración de Desastres" class="logo-img" width="52" height="52" />
+          <span class="logo-text">IASIEDAGREC</span>
+        </router-link>
+        <UserManualButton />
+      </div>
       <nav class="nav">
         <template v-if="estaAutenticado">
           <template v-if="esAdmin">
@@ -32,6 +35,7 @@
 <script setup>
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
+import UserManualButton from './UserManualButton.vue'
 import { useAuth } from '../composables/useAuth'
 
 const router = useRouter()
@@ -67,6 +71,12 @@ function cerrarSesion() {
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 1rem;
+}
+.header-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  flex-wrap: wrap;
 }
 .logo {
   display: flex;

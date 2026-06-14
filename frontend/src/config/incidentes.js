@@ -111,6 +111,7 @@ export const MAPA_BOUNDS_CARABOBO = [
 export const MUNICIPIOS_CARABOBO = [
   'Valencia', 'Naguanagua', 'San Diego', 'Guacara', 'Mariara', 'Diego Ibarra',
   'Puerto Cabello', 'Juan José Mora', 'Bejuma', 'Miranda', 'Montalbán', 'Carlos Arvelo',
+  'San Joaquín', 'Los Guayos', 'Libertador',
 ]
 
 export const PARROQUIAS_POR_MUNICIPIO = {

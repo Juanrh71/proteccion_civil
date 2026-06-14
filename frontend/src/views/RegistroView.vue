@@ -727,6 +727,8 @@ const enviando = ref(false)
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const soloDigitos = /^\d+$/
+const nombrePersonaRegex = /^[A-Za-zÁÉÍÓÚáéíóúÑñÜü\s.'-]{2,60}$/
+const slugCatalogoRegex = /^[a-z0-9_]{1,100}$/
 
 
 function abrirPanel(panel) {
@@ -780,6 +782,11 @@ async function crearCategoriaAdmin() {
     errorCatalogo.value = 'Indique el nombre de la categoría.'
     return
   }
+  const slug = String(nuevaCategoria.value.slug || '').trim()
+  if (slug && !slugCatalogoRegex.test(slug)) {
+    errorCatalogo.value = 'El identificador solo puede usar minúsculas, números y guion bajo.'
+    return
+  }
   creandoCategoria.value = true
   errorCatalogo.value = ''
   try {
@@ -787,7 +794,6 @@ async function crearCategoriaAdmin() {
       nombre: String(nuevaCategoria.value.nombre).trim(),
       color: nuevaCategoria.value.color || '#64748b',
     }
-    const slug = String(nuevaCategoria.value.slug || '').trim()
     if (slug) body.slug = slug
     const creada = await postCategoriaCatalogo(body)
     if (creada && creada.id != null) {
@@ -817,6 +823,11 @@ async function crearTipoAdmin() {
     errorCatalogo.value = 'Indique el nombre del tipo.'
     return
   }
+  const slug = String(nuevoTipo.value.slug || '').trim()
+  if (slug && !slugCatalogoRegex.test(slug)) {
+    errorCatalogo.value = 'El identificador solo puede usar minúsculas, números y guion bajo.'
+    return
+  }
   creandoTipo.value = true
   errorCatalogo.value = ''
   try {
@@ -824,7 +835,6 @@ async function crearTipoAdmin() {
       id_categoria: idCat,
       nombre: String(nuevoTipo.value.nombre).trim(),
     }
-    const slug = String(nuevoTipo.value.slug || '').trim()
     if (slug) body.slug = slug
     await postTipoCatalogo(body)
     nuevoTipo.value = { id_categoria: '', nombre: '', slug: '' }
@@ -1118,9 +1128,15 @@ function validar() {
   if (!f.nombre.trim()) {
     errores.nombre = 'El nombre es requerido.'
     ok = false
+  } else if (!nombrePersonaRegex.test(f.nombre.trim())) {
+    errores.nombre = 'El nombre solo debe contener letras y tener entre 2 y 60 caracteres.'
+    ok = false
   }
   if (!f.apellido.trim()) {
     errores.apellido = 'El apellido es requerido.'
+    ok = false
+  } else if (!nombrePersonaRegex.test(f.apellido.trim())) {
+    errores.apellido = 'El apellido solo debe contener letras y tener entre 2 y 60 caracteres.'
     ok = false
   }
   if (!f.correo.trim()) {

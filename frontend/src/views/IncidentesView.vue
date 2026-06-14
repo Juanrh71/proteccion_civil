@@ -578,7 +578,6 @@
           mode="edit"
           submit-label="Guardar EDAN"
           @submit="guardarEdanEditado"
-          @cancel="cerrarModalEdan"
         />
       </div>
     </div>

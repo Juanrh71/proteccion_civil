@@ -22,6 +22,12 @@ export async function listarEdan() {
   return Array.isArray(data) ? data : []
 }
 
+/** Reportes EDAN con coordenadas de los últimos 7 días (mapa en vivo). */
+export async function listarEdanMapaVivo() {
+  const { data } = await api.get('/api/edan/mapa-vivo')
+  return Array.isArray(data) ? data : []
+}
+
 export async function obtenerEdanPorId(id) {
   const { data } = await api.get(`/api/edan/${id}`)
   return data

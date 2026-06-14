@@ -6,6 +6,7 @@ const router = Router()
 
 const SLUG_RE = /^[a-z0-9_]{1,100}$/
 const HEX_COLOR_RE = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i
+const NOMBRE_CATALOGO_RE = /^[A-Za-z0-9ÁÉÍÓÚáéíóúÑñÜü\s().,/-]{2,100}$/
 
 const CATEGORY_COLOR_BY_SLUG = {
   hecho_vial: '#6d28d9',
@@ -47,6 +48,15 @@ function slugify(nombre) {
 function trunc100(s) {
   const t = String(s || '').trim()
   return t.length > 100 ? t.slice(0, 100) : t
+}
+
+function validarNombreCatalogo(nombre, etiqueta) {
+  const n = trunc100(nombre)
+  if (!n) return `Indique el nombre ${etiqueta}.`
+  if (!NOMBRE_CATALOGO_RE.test(n)) {
+    return `El nombre ${etiqueta} solo admite letras, números y signos básicos.`
+  }
+  return ''
 }
 
 function normalizeColor(input, fallback = '#64748b') {
@@ -148,9 +158,8 @@ router.get('/completo', requireAdmin, async (req, res) => {
 router.post('/categorias', requireAdmin, async (req, res) => {
   try {
     const { nombre, slug: slugIn, color, emergencia, orden } = req.body
-    if (!nombre || !String(nombre).trim()) {
-      return res.status(400).json({ error: 'Indique el nombre de la categoría.' })
-    }
+    const errorNombre = validarNombreCatalogo(nombre, 'de la categoría')
+    if (errorNombre) return res.status(400).json({ error: errorNombre })
     const slug = (slugIn && String(slugIn).trim()) || slugify(nombre)
     if (!SLUG_RE.test(slug)) {
       return res.status(400).json({
@@ -160,6 +169,13 @@ router.post('/categorias', requireAdmin, async (req, res) => {
     const [dup] = await pool.query('SELECT id FROM categorias_incidentes WHERE slug = ?', [slug])
     if (dup.length) {
       return res.status(409).json({ error: 'Ya existe una categoría con ese identificador.' })
+    }
+    const [dupNombre] = await pool.query(
+      'SELECT id FROM categorias_incidentes WHERE LOWER(nombre) = LOWER(?)',
+      [trunc100(nombre)]
+    )
+    if (dupNombre.length) {
+      return res.status(409).json({ error: 'Ya existe una categoría con ese nombre.' })
     }
     const defaultColor = CATEGORY_COLOR_BY_SLUG[slug] || '#475569'
     const col = normalizeColor(color, defaultColor)
@@ -211,6 +227,13 @@ router.patch('/categorias/:id', requireAdmin, async (req, res) => {
       vals.push(activo === true || activo === 1 || activo === '1' ? 1 : 0)
     }
     if (nombre != null && String(nombre).trim() !== '') {
+      const errorNombre = validarNombreCatalogo(nombre, 'de la categoría')
+      if (errorNombre) return res.status(400).json({ error: errorNombre })
+      const [dupNombre] = await pool.query(
+        'SELECT id FROM categorias_incidentes WHERE LOWER(nombre) = LOWER(?) AND id <> ?',
+        [trunc100(nombre), id]
+      )
+      if (dupNombre.length) return res.status(409).json({ error: 'Ya existe una categoría con ese nombre.' })
       parts.push('nombre = ?')
       vals.push(trunc100(nombre))
     }
@@ -260,9 +283,8 @@ router.post('/tipos', requireAdmin, async (req, res) => {
     if (isNaN(idCat)) {
       return res.status(400).json({ error: 'Indique la categoría (id_categoria).' })
     }
-    if (!nombre || !String(nombre).trim()) {
-      return res.status(400).json({ error: 'Indique el nombre del tipo.' })
-    }
+    const errorNombre = validarNombreCatalogo(nombre, 'del tipo')
+    if (errorNombre) return res.status(400).json({ error: errorNombre })
     const [c] = await pool.query('SELECT id FROM categorias_incidentes WHERE id = ?', [idCat])
     if (!c.length) {
       return res.status(400).json({ error: 'Categoría no encontrada.' })
@@ -290,6 +312,13 @@ router.post('/tipos', requireAdmin, async (req, res) => {
     const [dup] = await pool.query('SELECT id FROM tipos_de_incidentes WHERE slug = ?', [slug])
     if (dup.length) {
       return res.status(409).json({ error: 'Ya existe un tipo con ese identificador.' })
+    }
+    const [dupNombre] = await pool.query(
+      'SELECT id FROM tipos_de_incidentes WHERE id_categoria = ? AND LOWER(nombre) = LOWER(?)',
+      [idCat, trunc100(nombre)]
+    )
+    if (dupNombre.length) {
+      return res.status(409).json({ error: 'Ya existe un tipo con ese nombre en la categoría seleccionada.' })
     }
     const [r] = await pool.query(
       `INSERT INTO tipos_de_incidentes (slug, nombre, id_categoria, color, activo, orden)
@@ -319,11 +348,14 @@ router.patch('/tipos/:id', requireAdmin, async (req, res) => {
     const id = parseInt(req.params.id, 10)
     if (isNaN(id)) return res.status(400).json({ error: 'Id inválido' })
     const { activo, nombre, id_categoria, color, orden } = req.body
-    const [prev] = await pool.query('SELECT id, slug, color FROM tipos_de_incidentes WHERE id = ?', [id])
+    const [prev] = await pool.query('SELECT id, slug, color, nombre, id_categoria FROM tipos_de_incidentes WHERE id = ?', [id])
     if (!prev.length) return res.status(404).json({ error: 'Tipo no encontrado' })
     const prevTipo = prev[0]
     if (id_categoria != null) {
       const idCat = parseInt(id_categoria, 10)
+      if (isNaN(idCat) || idCat < 1) {
+        return res.status(400).json({ error: 'Categoría inválida.' })
+      }
       const [c] = await pool.query('SELECT id FROM categorias_incidentes WHERE id = ?', [idCat])
       if (!c.length) {
         return res.status(400).json({ error: 'Categoría no encontrada.' })
@@ -336,6 +368,8 @@ router.patch('/tipos/:id', requireAdmin, async (req, res) => {
       vals.push(activo === true || activo === 1 || activo === '1' ? 1 : 0)
     }
     if (nombre != null && String(nombre).trim() !== '') {
+      const errorNombre = validarNombreCatalogo(nombre, 'del tipo')
+      if (errorNombre) return res.status(400).json({ error: errorNombre })
       parts.push('nombre = ?')
       vals.push(trunc100(nombre))
     }
@@ -362,6 +396,17 @@ router.patch('/tipos/:id', requireAdmin, async (req, res) => {
       }
       parts.push('color = ?')
       vals.push(col)
+    }
+    if (nombre != null || id_categoria != null) {
+      const nombreFinal = nombre != null && String(nombre).trim() !== '' ? trunc100(nombre) : prevTipo.nombre
+      const idCategoriaFinal = id_categoria != null ? parseInt(id_categoria, 10) : prevTipo.id_categoria
+      const [dupNombre] = await pool.query(
+        'SELECT id FROM tipos_de_incidentes WHERE id_categoria = ? AND LOWER(nombre) = LOWER(?) AND id <> ?',
+        [idCategoriaFinal, nombreFinal, id]
+      )
+      if (dupNombre.length) {
+        return res.status(409).json({ error: 'Ya existe un tipo con ese nombre en la categoría seleccionada.' })
+      }
     }
     if (parts.length === 0) {
       return res.status(400).json({ error: 'Nada que actualizar.' })

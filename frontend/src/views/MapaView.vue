@@ -15,6 +15,9 @@
       <span class="activas">
         Emergencias visibles: <strong>{{ incidentesFiltrados.length }}</strong>
         <small v-if="hayFiltros">de {{ incidentes.length }}</small>
+        <span v-if="reportesEdanFiltrados.length" class="edan-count">
+          · EDAN: <strong>{{ reportesEdanFiltrados.length }}</strong>
+        </span>
       </span>
       <span v-if="actualizando" class="polling">Actualizando…</span>
       <span v-else class="polling muted">Última actualización: {{ ultimaActualizacionTexto }}</span>
@@ -65,11 +68,20 @@
     </div>
 
     <div class="mapa-box card">
-      <MapaCarabobo :incidentes="incidentesFiltrados" mostrar-buscador encuadrar-estado-carabobo />
+      <MapaCarabobo
+        :incidentes="incidentesFiltrados"
+        :reportes-edan="reportesEdanFiltrados"
+        mostrar-buscador
+        encuadrar-estado-carabobo
+      />
     </div>
     <div class="leyenda card">
       <h3>Leyenda del mapa</h3>
       <div class="leyenda-items">
+        <span class="leyenda-item leyenda-item--edan">
+          <i class="leyenda-edan" />
+          Reporte EDAN (7 días)
+        </span>
         <span v-for="cat in categoriasLeyenda" :key="cat.id" class="leyenda-item">
           <i :style="{ background: cat.color }" />
           {{ cat.nombre }}
@@ -84,6 +96,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import MapaCarabobo from '../components/MapaCarabobo.vue'
 import { obtenerIncidentes } from '../api/incidentes'
+import { listarEdanMapaVivo } from '../api/edan.js'
 import { useCatalogoIncidentes } from '../composables/useCatalogoIncidentes.js'
 import { useAuth } from '../composables/useAuth'
 import { MUNICIPIOS_CARABOBO } from '../config/incidentes.js'
@@ -94,6 +107,7 @@ const { usuario } = useAuth()
 const esAdmin = computed(() => usuario.value?.rol === 'admin')
 const { leyendaMapa } = useCatalogoIncidentes()
 const incidentes = ref([])
+const reportesEdan = ref([])
 const filtroCategoria = ref('')
 const filtroRegion = ref('')
 const actualizando = ref(false)
@@ -116,6 +130,11 @@ const regionesBusqueda = computed(() => {
   for (const inc of incidentes.value) {
     if (inc?.municipio) set.add(inc.municipio)
     if (inc?.parroquia) set.add(inc.parroquia)
+  }
+  for (const rep of reportesEdan.value) {
+    if (rep?.municipio) set.add(rep.municipio)
+    if (rep?.parroquia) set.add(rep.parroquia)
+    if (rep?.sector) set.add(rep.sector)
   }
   return Array.from(set).sort((a, b) => a.localeCompare(b, 'es'))
 })
@@ -151,10 +170,21 @@ function coincideRegion(inc, texto) {
   return campos.some((campo) => normalizarBusqueda(campo).includes(q))
 }
 
+function coincideRegionEdan(rep, texto) {
+  const q = normalizarBusqueda(texto)
+  if (!q) return true
+  const campos = [rep?.municipio, rep?.parroquia, rep?.sector, rep?.direccion]
+  return campos.some((campo) => normalizarBusqueda(campo).includes(q))
+}
+
 const incidentesFiltrados = computed(() =>
   incidentes.value.filter(
     (inc) => coincideCategoria(inc, filtroCategoria.value) && coincideRegion(inc, filtroRegion.value)
   )
+)
+
+const reportesEdanFiltrados = computed(() =>
+  reportesEdan.value.filter((rep) => coincideRegionEdan(rep, filtroRegion.value))
 )
 
 function limpiarFiltros() {
@@ -169,7 +199,12 @@ function irMenuAdmin() {
 async function refrescar() {
   actualizando.value = true
   try {
-    incidentes.value = await obtenerIncidentes({ soloAbiertos: true })
+    const [incData, edanData] = await Promise.all([
+      obtenerIncidentes({ soloAbiertos: true }),
+      listarEdanMapaVivo(),
+    ])
+    incidentes.value = incData
+    reportesEdan.value = edanData
     errorCarga.value = ''
     ultimaActualizacion.value = new Date()
   } catch (e) {
@@ -253,6 +288,14 @@ onUnmounted(() => {
   margin-left: 0.25rem;
   color: var(--color-text-muted);
   font-weight: 500;
+}
+.edan-count {
+  margin-left: 0.35rem;
+  color: #be185d;
+  font-weight: 600;
+}
+.edan-count strong {
+  color: #be185d;
 }
 .polling {
   font-size: 0.8125rem;
@@ -372,6 +415,15 @@ onUnmounted(() => {
   border: 1px solid rgba(15, 23, 42, 0.28);
   display: inline-block;
   flex-shrink: 0;
+}
+.leyenda-edan {
+  background: #ff69b4;
+  border-color: #fff !important;
+  box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.2);
+}
+.leyenda-item--edan {
+  font-weight: 600;
+  color: #be185d;
 }
 
 @media (max-width: 900px) {

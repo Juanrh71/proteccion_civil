@@ -20,7 +20,7 @@
             <input v-model="form.numero_planilla" class="input" maxlength="50" @input="form.numero_planilla = sanitizarAlphaNumGuion(form.numero_planilla)" />
           </div>
           <div class="form-group">
-            <label>Nro informe</label>
+            <label>Nro. informe</label>
             <input v-model="form.nro_informe" class="input" maxlength="50" @input="form.nro_informe = sanitizarAlphaNumGuion(form.nro_informe)" />
           </div>
           <div class="form-group">
@@ -65,16 +65,16 @@
             <input v-model="form.sector" class="input" maxlength="100" @input="form.sector = sanitizarLetras(form.sector)" />
           </div>
           <div class="form-group">
-            <label>Nro casa</label>
+            <label>Nro. casa</label>
             <input v-model="form.nro_casa" class="input" maxlength="20" @input="form.nro_casa = sanitizarAlphaNumGuion(form.nro_casa)" />
           </div>
           <div class="form-group">
-            <label>Urbanizacion</label>
+            <label>Urbanización</label>
             <input v-model="form.urbanizacion" class="input" maxlength="100" @input="form.urbanizacion = sanitizarLetras(form.urbanizacion)" />
           </div>
           <div class="form-group">
-            <label>Direccion</label>
-            <input v-model="form.direccion" class="input" maxlength="255" />
+            <label>Dirección</label>
+            <input v-model="form.direccion" class="input" maxlength="255" @input="form.direccion = sanitizarDireccion(form.direccion, 255)" />
           </div>
           <div class="form-group">
             <label>Latitud (opcional)</label>
@@ -113,7 +113,7 @@
             </select>
           </div>
           <div class="form-group">
-            <label>Condicion vivienda</label>
+            <label>Condición vivienda</label>
             <select v-model="form.condicion_vivienda" class="input">
               <option value="">Seleccione</option>
               <option value="afectada">Afectada</option>
@@ -125,22 +125,22 @@
             <label>Tipo vivienda</label>
             <select v-model="form.tipo_vivienda" class="input">
               <option value="">Seleccione</option>
-              <option value="anarquica">Anarquica</option>
+              <option value="anarquica">Anárquica</option>
               <option value="improvisada">Improvisada</option>
               <option value="casa convencional">Casa convencional</option>
             </select>
           </div>
           <div class="form-group" v-if="form.tipo_afectacion === 'otros'">
             <label>Afectación otros</label>
-            <input v-model="form.afectacion_otros" class="input" maxlength="255" />
+            <input v-model="form.afectacion_otros" class="input" maxlength="255" @input="form.afectacion_otros = sanitizarDireccion(form.afectacion_otros, 255)" />
           </div>
           <div class="form-group form-group-full">
             <label>Descripción de la afectación</label>
-            <textarea v-model="form.descripcion_afectacion" class="input" rows="3" maxlength="4000" />
+            <textarea v-model="form.descripcion_afectacion" class="input" rows="3" maxlength="4000" @input="form.descripcion_afectacion = sanitizarDireccion(form.descripcion_afectacion, 4000)" />
           </div>
           <div class="form-group form-group-full">
             <label>Descripción de la vivienda</label>
-            <textarea v-model="form.descripcion_vivienda" class="input" rows="3" maxlength="4000" />
+            <textarea v-model="form.descripcion_vivienda" class="input" rows="3" maxlength="4000" @input="form.descripcion_vivienda = sanitizarDireccion(form.descripcion_vivienda, 4000)" />
           </div>
         </div>
       </template>
@@ -149,15 +149,15 @@
         <div class="grid-3">
           <div class="form-group"><label>Lact Fem</label><input v-model.number="form.lact_Fem" type="number" min="0" class="input" /></div>
           <div class="form-group"><label>Lact Masc</label><input v-model.number="form.lact_Masc" type="number" min="0" class="input" /></div>
-          <div class="form-group"><label>Ninos Fem</label><input v-model.number="form.ninos_Fem" type="number" min="0" class="input" /></div>
-          <div class="form-group"><label>Ninos Masc</label><input v-model.number="form.ninos_Masc" type="number" min="0" class="input" /></div>
+          <div class="form-group"><label>Niños Fem</label><input v-model.number="form.ninos_Fem" type="number" min="0" class="input" /></div>
+          <div class="form-group"><label>Niños Masc</label><input v-model.number="form.ninos_Masc" type="number" min="0" class="input" /></div>
           <div class="form-group"><label>Adultos Fem</label><input v-model.number="form.adultos_Fem" type="number" min="0" class="input" /></div>
           <div class="form-group"><label>Adultos Masc</label><input v-model.number="form.adultos_Masc" type="number" min="0" class="input" /></div>
           <div class="form-group"><label>3era edad Fem</label><input v-model.number="form.tercera_edad_Fem" type="number" min="0" class="input" /></div>
           <div class="form-group"><label>3era edad Masc</label><input v-model.number="form.tercera_edad_Masc" type="number" min="0" class="input" /></div>
           <div class="form-group"><label>Discapacitados</label><input v-model.number="form.discapacitados" type="number" min="0" class="input" /></div>
           <div class="form-group"><label>Total personas</label><input v-model.number="form.total_personas" type="number" min="0" class="input" /></div>
-          <div class="form-group"><label>Nro familias</label><input v-model.number="form.nro_familias" type="number" min="0" class="input" /></div>
+          <div class="form-group"><label>Nro. familias</label><input v-model.number="form.nro_familias" type="number" min="0" class="input" /></div>
         </div>
         <div class="detalle-toolbar">
           <h3>Afectados (detalle)</h3>
@@ -196,19 +196,19 @@
         <div class="grid-2">
           <div class="form-group form-group-full">
             <label>Requerimientos por afectación</label>
-            <textarea v-model="form.requerimientos_afectacion" class="input" rows="3" maxlength="4000" />
+            <textarea v-model="form.requerimientos_afectacion" class="input" rows="3" maxlength="4000" @input="form.requerimientos_afectacion = sanitizarDireccion(form.requerimientos_afectacion, 4000)" />
           </div>
           <div class="form-group">
             <label>Pérdidas de enseres total</label>
-            <textarea v-model="form.P_enseres_total" class="input" rows="2" maxlength="4000" />
+            <textarea v-model="form.P_enseres_total" class="input" rows="2" maxlength="4000" @input="form.P_enseres_total = sanitizarDireccion(form.P_enseres_total, 4000)" />
           </div>
           <div class="form-group">
             <label>Pérdidas de enseres parcial</label>
-            <textarea v-model="form.P_enseres_parcial" class="input" rows="2" maxlength="4000" />
+            <textarea v-model="form.P_enseres_parcial" class="input" rows="2" maxlength="4000" @input="form.P_enseres_parcial = sanitizarDireccion(form.P_enseres_parcial, 4000)" />
           </div>
           <div class="form-group">
             <label>Sin pérdidas de enseres</label>
-            <textarea v-model="form.p_enseres_no" class="input" rows="2" maxlength="4000" />
+            <textarea v-model="form.p_enseres_no" class="input" rows="2" maxlength="4000" @input="form.p_enseres_no = sanitizarDireccion(form.p_enseres_no, 4000)" />
           </div>
           <div class="form-group">
             <label>Falla de agua</label>
@@ -243,7 +243,7 @@
     </p>
     <footer class="edan-actions">
       <button type="button" class="btn btn-secondary" :disabled="pasoActual === 1 || submitting" @click="pasoAnterior">
-        ← Atras
+        ← Atrás
       </button>
       <button
         v-if="pasoActual < PASOS.length"
@@ -411,6 +411,12 @@ function sanitizarAlphaNumGuion(v) {
     .slice(0, 50)
 }
 
+function sanitizarDireccion(v, maxLen = 255) {
+  return String(v || '')
+    .replace(/[^A-Za-z0-9ÁÉÍÓÚáéíóúÑñÜü\s.,#°º/-]/g, '')
+    .slice(0, maxLen)
+}
+
 function formatearTelefono(v) {
   const d = String(v || '').replace(/\D/g, '').slice(0, 11)
   if (d.length <= 4) return d
@@ -425,6 +431,11 @@ function enteroValido(n, min = 0, max = 999999) {
   return Number.isInteger(Number(n)) && Number(n) >= min && Number(n) <= max
 }
 
+function fechaValida(v) {
+  const d = new Date(v)
+  return !Number.isNaN(d.getTime()) ? d : null
+}
+
 function validarCoords() {
   const lat = form.value.lat
   const lng = form.value.lng
@@ -435,7 +446,7 @@ function validarCoords() {
   const nLat = Number(lat)
   const nLng = Number(lng)
   if (!Number.isFinite(nLat) || !Number.isFinite(nLng)) {
-    return 'Latitud y longitud deben ser numericas.'
+    return 'Latitud y longitud deben ser numéricas.'
   }
   const [[minLat, minLng], [maxLat, maxLng]] = MAPA_BOUNDS_CARABOBO
   if (nLat < minLat || nLat > maxLat || nLng < minLng || nLng > maxLng) {
@@ -475,13 +486,18 @@ function validarPaso(idx) {
     if (!tieneSoloLetras(form.value.parroquia)) return 'Parroquia solo permite letras.'
     if (isBlank(form.value.sector)) return 'Sector es obligatorio.'
     if (!tieneSoloLetras(form.value.sector)) return 'Sector solo permite letras.'
-    if (!isBlank(form.value.urbanizacion) && !tieneSoloLetras(form.value.urbanizacion)) {
-      return 'Urbanizacion solo permite letras.'
+    if (isBlank(form.value.urbanizacion)) return 'Urbanización es obligatoria.'
+    if (!tieneSoloLetras(form.value.urbanizacion)) {
+      return 'Urbanización solo permite letras.'
     }
-    if (!isBlank(form.value.nro_casa) && !/^[A-Za-z0-9-]+$/.test(String(form.value.nro_casa || '').trim())) {
+    if (isBlank(form.value.nro_casa)) return 'Nro. casa es obligatorio.'
+    if (!/^[A-Za-z0-9-]+$/.test(String(form.value.nro_casa || '').trim())) {
       return 'Nro. casa solo admite letras, números y guion.'
     }
-    if (isBlank(form.value.direccion)) return 'Direccion es obligatoria.'
+    if (isBlank(form.value.direccion)) return 'Dirección es obligatoria.'
+    if (!/^[A-Za-z0-9ÁÉÍÓÚáéíóúÑñÜü\s.,#°º/-]+$/.test(String(form.value.direccion || '').trim())) {
+      return 'Dirección solo admite letras, números y signos básicos.'
+    }
     const errCoords = validarCoords()
     if (errCoords) return errCoords
     return ''
@@ -489,6 +505,14 @@ function validarPaso(idx) {
   if (idx === 3) {
     if (isBlank(form.value.fecha_solicitud)) return 'Fecha de solicitud es obligatoria.'
     if (isBlank(form.value.fecha_afectacion)) return 'Fecha de afectación es obligatoria.'
+    const solicitud = fechaValida(form.value.fecha_solicitud)
+    const afectacion = fechaValida(form.value.fecha_afectacion)
+    if (!solicitud) return 'Fecha de solicitud no es válida.'
+    if (!afectacion) return 'Fecha de afectación no es válida.'
+    const ahora = new Date()
+    if (solicitud > ahora) return 'Fecha de solicitud no puede ser futura.'
+    if (afectacion > ahora) return 'Fecha de afectación no puede ser futura.'
+    if (afectacion > solicitud) return 'Fecha de afectación no puede ser posterior a la solicitud.'
     return ''
   }
   if (idx === 4) {
@@ -496,7 +520,7 @@ function validarPaso(idx) {
     if (form.value.tipo_afectacion === 'otros' && isBlank(form.value.afectacion_otros)) {
       return 'Debe describir afectación en otros.'
     }
-    if (isBlank(form.value.condicion_vivienda)) return 'Seleccione condicion de vivienda.'
+    if (isBlank(form.value.condicion_vivienda)) return 'Seleccione condición de vivienda.'
     if (isBlank(form.value.tipo_vivienda)) return 'Seleccione tipo de vivienda.'
     if (isBlank(form.value.descripcion_afectacion)) return 'Descripción de afectación es obligatoria.'
     if (isBlank(form.value.descripcion_vivienda)) return 'Descripción de vivienda es obligatoria.'
@@ -519,6 +543,8 @@ function validarPaso(idx) {
     for (const k of numericos) {
       if (!enteroValido(form.value[k])) return `El campo ${k} debe ser entero no negativo.`
     }
+    if (Number(form.value.total_personas) <= 0) return 'Total personas debe ser mayor que cero.'
+    if (Number(form.value.nro_familias) <= 0) return 'Nro. familias debe ser mayor que cero.'
     const suma =
       form.value.lact_Fem +
       form.value.lact_Masc +
@@ -528,17 +554,26 @@ function validarPaso(idx) {
       form.value.adultos_Masc +
       form.value.tercera_edad_Fem +
       form.value.tercera_edad_Masc
+    if (suma <= 0) {
+      return 'Debe registrar al menos una persona en los grupos etarios.'
+    }
     if (form.value.total_personas < suma) {
       return 'Total personas no puede ser menor que la suma de grupos etarios.'
+    }
+    if (!form.value.detalles_familiares.length) {
+      return 'Debe agregar al menos una fila en el detalle de afectados.'
     }
     for (const f of form.value.detalles_familiares) {
       const nombre = String(f?.nombre_completo || '').trim()
       const cedula = String(f?.cedula || '').trim()
-      if (!nombre && !cedula) continue
       if (!nombre) return 'En detalle familiar, nombre y apellido es obligatorio.'
       if (!tieneSoloLetras(nombre)) return 'En detalle familiar, nombre y apellido solo permite letras.'
+      if (!cedula) return 'En detalle familiar, cédula es obligatoria.'
       if (!/^\d{6,20}$/.test(cedula)) return 'En detalle familiar, cédula debe ser numérica (6 a 20 dígitos).'
       if (!enteroValido(f?.edad, 0, 130)) return 'En detalle familiar, edad debe ser válida (0 a 130).'
+      if (!['Femenino', 'Masculino'].includes(String(f?.genero || ''))) {
+        return 'En detalle familiar, sexo debe ser Femenino o Masculino.'
+      }
     }
     return ''
   }

@@ -29,6 +29,8 @@ const CARABOBO_BOUNDS = {
   minLng: -68.55,
   maxLng: -67.32,
 }
+const TEXTO_UBICACION = /^[A-Za-z0-9ÁÉÍÓÚáéíóúÑñÜü\s.,#°º/-]+$/
+const SLUG_SEGURO = /^[a-z0-9_:-]+$/
 
 /** Id de usuario autenticado (Bearer) o null */
 function idUsuarioAutenticado(req) {
@@ -183,6 +185,12 @@ function validarUbicacionIncidente({ municipio, via, lat, lng }) {
   if (!viaTrim) {
     return 'La calle, avenida o referencia es obligatoria.'
   }
+  if (viaTrim.length > 255) {
+    return 'La calle, avenida o referencia no puede superar 255 caracteres.'
+  }
+  if (!TEXTO_UBICACION.test(viaTrim)) {
+    return 'La calle, avenida o referencia solo admite letras, números y signos básicos.'
+  }
   if (!municipioEsCarabobo(municipio)) {
     return 'Solo se permiten municipios del estado Carabobo.'
   }
@@ -195,6 +203,79 @@ function validarUbicacionIncidente({ municipio, via, lat, lng }) {
     return 'Las coordenadas deben ubicarse dentro del estado Carabobo.'
   }
   return ''
+}
+
+function validarTextoUbicacionOpcional(valor, campo, maxLen = 100) {
+  const t = String(valor || '').trim()
+  if (!t) return null
+  if (t.length > maxLen) return `${campo} no puede superar ${maxLen} caracteres.`
+  if (!TEXTO_UBICACION.test(t)) return `${campo} solo admite letras, números y signos básicos.`
+  return null
+}
+
+function textoCorto(valor, maxLen = 255) {
+  return String(valor || '').trim().slice(0, maxLen)
+}
+
+async function resolverTipoIncidente(tipo, categoria) {
+  const tipoSlug = String(tipo || '').trim()
+  const categoriaSlug = String(categoria || '').trim()
+  if (!tipoSlug) {
+    throw new Error('Seleccione el tipo de incidente.')
+  }
+  if (tipoSlug.length > 100 || !SLUG_SEGURO.test(tipoSlug)) {
+    throw new Error('El tipo de incidente tiene un formato inválido.')
+  }
+  if (!categoriaSlug) {
+    throw new Error('Seleccione la categoría del incidente.')
+  }
+  if (categoriaSlug.length > 100 || !SLUG_SEGURO.test(categoriaSlug)) {
+    throw new Error('La categoría del incidente tiene un formato inválido.')
+  }
+
+  const [rows] = await pool.query(
+    `SELECT
+       t.slug AS tipo_slug,
+       t.nombre AS tipo_nombre,
+       c.slug AS categoria_slug,
+       c.nombre AS categoria_nombre
+     FROM tipos_de_incidentes t
+     INNER JOIN categorias_incidentes c ON t.id_categoria = c.id
+     WHERE t.slug = ?
+     LIMIT 1`,
+    [tipoSlug]
+  )
+
+  if (!rows || rows.length === 0) {
+    return {
+      tipo: tipoSlug,
+      tipo_nombre: tipoSlug,
+      categoria: categoriaSlug,
+    }
+  }
+
+  const row = rows[0]
+  if (row.categoria_slug && row.categoria_slug !== categoriaSlug) {
+    throw new Error('El tipo no corresponde a la categoría elegida.')
+  }
+  return {
+    tipo: row.tipo_slug || tipoSlug,
+    tipo_nombre: row.tipo_nombre || tipoSlug,
+    categoria: row.categoria_nombre || row.categoria_slug || categoriaSlug,
+  }
+}
+
+function esErrorValidacionIncidente(msg) {
+  return (
+    msg.includes('Seleccione') ||
+    msg.includes('formato inválido') ||
+    msg.includes('no corresponde') ||
+    msg.includes('obligatoria') ||
+    msg.includes('solo admite') ||
+    msg.includes('superar') ||
+    msg.includes('Carabobo') ||
+    msg.includes('coordenadas')
+  )
 }
 
 function enteroONull(v) {
@@ -357,8 +438,14 @@ router.post('/reportar', upload.single('evidencia'), async (req, res) => {
       return res.status(400).json({ error: 'id_tipo inválido' })
     }
 
-    const nHeridos = parseInt(heridos_cierre, 10) || 0
-    const nFallecidos = parseInt(fallecidos_cierre, 10) || 0
+    const nHeridos = heridos_cierre == null || heridos_cierre === '' ? 0 : parseInt(heridos_cierre, 10)
+    const nFallecidos = fallecidos_cierre == null || fallecidos_cierre === '' ? 0 : parseInt(fallecidos_cierre, 10)
+    if (!Number.isFinite(nHeridos) || nHeridos < 0 || nHeridos > 999999) {
+      return res.status(400).json({ error: 'Indique un número válido de heridos (0 o más).' })
+    }
+    if (!Number.isFinite(nFallecidos) || nFallecidos < 0 || nFallecidos > 999999) {
+      return res.status(400).json({ error: 'Indique un número válido de fallecidos (0 o más).' })
+    }
     const afAllowed = ['No', 'Heridos', 'Muertos']
     let estadoAfectados = afectadosEnumDesdeConteos(nHeridos, nFallecidos)
     if (afectados != null && afAllowed.includes(String(afectados).trim())) {
@@ -426,14 +513,17 @@ router.post('/reportar', upload.single('evidencia'), async (req, res) => {
     if (errorUbicacion) {
       return res.status(400).json({ error: errorUbicacion })
     }
+    const errorParroquia = validarTextoUbicacionOpcional(parroquia, 'Parroquia', 100)
+    if (errorParroquia) return res.status(400).json({ error: errorParroquia })
+    const descripcionVal = textoCorto(descripcion, 4000)
 
     const [result] = await pool.query(sql, [
       idRep,
-      descripcion || '',
+      descripcionVal,
       latVal,
       lngVal,
       String(municipio).trim(),
-      parroquia || null,
+      parroquia != null && String(parroquia).trim() !== '' ? String(parroquia).trim().slice(0, 100) : null,
       String(via).trim(),
       procDb,
       evidencia_visual,
@@ -444,6 +534,9 @@ router.post('/reportar', upload.single('evidencia'), async (req, res) => {
       idTipo,
     ])
 
+    if (!result || result.affectedRows === 0) {
+      return res.status(400).json({ error: 'El tipo de incidente seleccionado no existe.' })
+    }
     res.status(201).json({ ok: true, id: result.insertId })
   } catch (err) {
     console.error('Error en POST /reportar:', err)
@@ -600,10 +693,8 @@ router.post('/', async (req, res) => {
       return res.status(401).json({ error: 'Usuario no válido. Vuelva a iniciar sesión.' })
     }
 
-    const { tipo, tipo_nombre, categoria, descripcion, lat, lng, municipio, parroquia, via, fecha } = req.body
-    if (tipo == null || String(tipo).trim() === '') {
-      return res.status(400).json({ error: 'Falta el tipo de incidente' })
-    }
+    const { tipo, categoria, descripcion, lat, lng, municipio, parroquia, via, fecha } = req.body
+    const tipoCatalogo = await resolverTipoIncidente(tipo, categoria)
     const latVal = coorANumeroONull(lat)
     const lngVal = coorANumeroONull(lng)
     const errorUbicacion = validarUbicacionIncidente({
@@ -615,18 +706,21 @@ router.post('/', async (req, res) => {
     if (errorUbicacion) {
       return res.status(400).json({ error: errorUbicacion })
     }
+    const errorParroquia = validarTextoUbicacionOpcional(parroquia, 'Parroquia', 100)
+    if (errorParroquia) return res.status(400).json({ error: errorParroquia })
+    const descripcionVal = textoCorto(descripcion, 4000)
     const [result] = await pool.query(
       `INSERT INTO incidentes (tipo, tipo_nombre, categoria, descripcion, lat, lng, municipio, parroquia, via, fecha, cerrado, estado, id_de_reportante, tipo_de_reportante)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 'abierto', ?, 'ciudadano')`,
       [
-        tipo,
-        tipo_nombre || tipo,
-        categoria != null && String(categoria).trim() !== '' ? String(categoria).trim() : null,
-        descripcion || '',
+        tipoCatalogo.tipo,
+        tipoCatalogo.tipo_nombre,
+        tipoCatalogo.categoria,
+        descripcionVal,
         latVal,
         lngVal,
         String(municipio).trim(),
-        parroquia != null && String(parroquia).trim() !== '' ? String(parroquia).trim() : null,
+        parroquia != null && String(parroquia).trim() !== '' ? String(parroquia).trim().slice(0, 100) : null,
         String(via).trim(),
         fecha ? new Date(fecha) : new Date(),
         idReportante,
@@ -639,7 +733,11 @@ router.post('/', async (req, res) => {
     res.status(201).json(mapRow(rows[0]))
   } catch (err) {
     console.error(err)
-    res.status(500).json({ error: 'Error al guardar incidente' })
+    const msg = err?.message || 'Error al guardar incidente'
+    const esValidacion = esErrorValidacionIncidente(msg)
+    res.status(esValidacion ? 400 : 500).json({
+      error: esValidacion ? msg : 'Error al guardar incidente',
+    })
   }
 })
 
@@ -774,10 +872,8 @@ router.put('/:id', async (req, res) => {
     if (Number.isFinite(segundosDesdeRegistro) && segundosDesdeRegistro >= 120) {
       return res.status(409).json({ error: 'No se puede editar: pasaron más de 2 minutos desde el registro.' })
     }
-    const { tipo, tipo_nombre, categoria, descripcion, lat, lng, municipio, parroquia, via } = req.body
-    if (tipo == null || String(tipo).trim() === '') {
-      return res.status(400).json({ error: 'Falta el tipo de incidente' })
-    }
+    const { tipo, categoria, descripcion, lat, lng, municipio, parroquia, via } = req.body
+    const tipoCatalogo = await resolverTipoIncidente(tipo, categoria)
     const latVal = coorANumeroONull(lat)
     const lngVal = coorANumeroONull(lng)
     const errorUbicacion = validarUbicacionIncidente({
@@ -789,20 +885,23 @@ router.put('/:id', async (req, res) => {
     if (errorUbicacion) {
       return res.status(400).json({ error: errorUbicacion })
     }
+    const errorParroquia = validarTextoUbicacionOpcional(parroquia, 'Parroquia', 100)
+    if (errorParroquia) return res.status(400).json({ error: errorParroquia })
     const viaVal = String(via).trim()
+    const descripcionVal = textoCorto(descripcion, 4000)
     const antesAuditoria = snapshotAuditoriaIncidente(previo)
     const usuarioEditor = await usuarioAutenticado(req)
     const [result] = await pool.query(
       `UPDATE incidentes SET tipo = ?, tipo_nombre = ?, categoria = ?, descripcion = ?, lat = ?, lng = ?, municipio = ?, parroquia = ?, via = ? WHERE id = ?`,
       [
-        tipo,
-        tipo_nombre || tipo,
-        categoria != null && String(categoria).trim() !== '' ? String(categoria).trim() : null,
-        descripcion || '',
+        tipoCatalogo.tipo,
+        tipoCatalogo.tipo_nombre,
+        tipoCatalogo.categoria,
+        descripcionVal,
         latVal,
         lngVal,
         String(municipio).trim(),
-        parroquia != null && String(parroquia).trim() !== '' ? String(parroquia).trim() : null,
+        parroquia != null && String(parroquia).trim() !== '' ? String(parroquia).trim().slice(0, 100) : null,
         viaVal,
         id,
       ]
@@ -824,7 +923,11 @@ router.put('/:id', async (req, res) => {
     res.json(mapRow(rows[0]))
   } catch (err) {
     console.error(err)
-    res.status(500).json({ error: 'Error al actualizar incidente' })
+    const msg = err?.message || 'Error al actualizar incidente'
+    const esValidacion = esErrorValidacionIncidente(msg)
+    res.status(esValidacion ? 400 : 500).json({
+      error: esValidacion ? msg : 'Error al actualizar incidente',
+    })
   }
 })
 

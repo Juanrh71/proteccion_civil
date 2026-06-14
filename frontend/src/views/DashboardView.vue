@@ -120,12 +120,21 @@
         </div>
       </div>
       <div class="map-box">
-        <MapaCarabobo :incidentes="incidentesFiltradosMapa" mostrar-buscador encuadrar-estado-carabobo />
+        <MapaCarabobo
+          :incidentes="incidentesFiltradosMapa"
+          :reportes-edan="reportesEdanFiltradosMapa"
+          mostrar-buscador
+          encuadrar-estado-carabobo
+        />
       </div>
       <div class="leyenda-mapa">
         <span v-for="cat in categoriasLeyendaMapa" :key="cat.id" class="leyenda-item">
           <i :style="{ background: cat.color }"></i>
           {{ cat.nombre }}
+        </span>
+        <span class="leyenda-item leyenda-item--edan">
+          <i class="leyenda-edan"></i>
+          Reporte EDAN
         </span>
       </div>
     </section>
@@ -151,6 +160,7 @@ import {
 } from 'chart.js'
 import { Line, Bar, Doughnut } from 'vue-chartjs'
 import MapaCarabobo from '../components/MapaCarabobo.vue'
+import { listarEdan } from '../api/edan.js'
 import { obtenerIncidentes } from '../api/incidentes'
 import {
   RANGO_ANO_INICIO,
@@ -211,6 +221,7 @@ const categoriasOpciones = computed(() => {
 })
 
 const incidentes = ref([])
+const reportesEdan = ref([])
 const errorIncidentes = ref('')
 const refrescando = ref(false)
 const ultimaActualizacion = ref(null)
@@ -588,16 +599,32 @@ const tipoPieOptions = {
 const tieneBarrasMuni = computed(() => muniBarData.value.datasets[0].data.some((n) => n > 0))
 const tieneTortaTipo = computed(() => tipoPieData.value.datasets[0].data.some((n) => n > 0))
 
+function coincideDiaMapa(fechaIso, dia, mes, ano) {
+  if (!fechaIso) return false
+  const d = new Date(fechaIso)
+  return d.getDate() === dia && d.getMonth() + 1 === mes && d.getFullYear() === ano
+}
+
+function edanTieneCoordenadas(rep) {
+  const lat = Number(rep?.lat)
+  const lng = Number(rep?.lng)
+  return Number.isFinite(lat) && Number.isFinite(lng)
+}
+
 const incidentesFiltradosMapa = computed(() => {
-  const list = incidentes.value
   const dia = filtroDia.value
   const mes = filtroMes.value
   const ano = filtroAno.value
-  return list.filter((inc) => {
-    if (!inc.fecha) return false
-    const d = new Date(inc.fecha)
-    return d.getDate() === dia && d.getMonth() + 1 === mes && d.getFullYear() === ano
-  })
+  return incidentes.value.filter((inc) => coincideDiaMapa(inc.fecha, dia, mes, ano))
+})
+
+const reportesEdanFiltradosMapa = computed(() => {
+  const dia = filtroDia.value
+  const mes = filtroMes.value
+  const ano = filtroAno.value
+  return reportesEdan.value.filter(
+    (rep) => edanTieneCoordenadas(rep) && coincideDiaMapa(rep.fecha_reporte, dia, mes, ano)
+  )
 })
 
 const categoriasLeyendaMapa = leyendaMapaDash
@@ -612,13 +639,19 @@ const ultimaActualizacionTexto = computed(() => {
   })
 })
 
+async function cargarDatosDashboard() {
+  const [incData, edanData] = await Promise.all([obtenerIncidentes(), listarEdan()])
+  incidentes.value = incData
+  reportesEdan.value = edanData
+  ultimaActualizacion.value = new Date()
+  errorIncidentes.value = ''
+}
+
 async function refrescarDatos() {
   if (refrescando.value) return
   refrescando.value = true
   try {
-    incidentes.value = await obtenerIncidentes()
-    ultimaActualizacion.value = new Date()
-    errorIncidentes.value = ''
+    await cargarDatosDashboard()
   } catch (e) {
     errorIncidentes.value = e?.message || 'Error al actualizar incidentes.'
   } finally {
@@ -628,17 +661,13 @@ async function refrescarDatos() {
 
 onMounted(async () => {
   try {
-    incidentes.value = await obtenerIncidentes()
-    errorIncidentes.value = ''
-    ultimaActualizacion.value = new Date()
+    await cargarDatosDashboard()
   } catch (e) {
     errorIncidentes.value = e?.message || 'No se pudieron cargar los incidentes para el tablero.'
   }
   pollingIncidentes = setInterval(async () => {
     try {
-      incidentes.value = await obtenerIncidentes()
-      errorIncidentes.value = ''
-      ultimaActualizacion.value = new Date()
+      await cargarDatosDashboard()
     } catch (e) {
       errorIncidentes.value = e?.message || 'Error al actualizar incidentes.'
     }
@@ -940,6 +969,17 @@ onUnmounted(() => {
   border: 1px solid rgba(15, 23, 42, 0.28);
   display: inline-block;
   flex-shrink: 0;
+}
+
+.leyenda-edan {
+  background: #ff69b4;
+  border-color: #fff !important;
+  box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.2);
+}
+
+.leyenda-item--edan {
+  font-weight: 600;
+  color: #be185d;
 }
 
 @media (max-width: 760px) {

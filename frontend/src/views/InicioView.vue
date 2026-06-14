@@ -131,7 +131,8 @@ onUnmounted(() => {
 
 <style scoped>
 .inicio {
-  max-width: 960px;
+  max-width: 1240px;
+  width: 100%;
 }
 
 .banner-carrusel {

@@ -12,6 +12,7 @@ const cedulaRegex = /^[VJE]\d{6,9}$/
 const telefonoRegex = /^04\d{9}$/
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const nombreRegex = /^[A-Za-zÁÉÍÓÚáéíóúÑñÜü\s.'-]{2,60}$/
 
 function estatusEsActivo(estatusRaw) {
   const est = String(estatusRaw || '')
@@ -91,7 +92,9 @@ function validarRegistro(body) {
   const { nombre, apellido, correo, cedula, telefono, password, confirmacion } = body
 
   if (!nombre || !nombre.toString().trim()) errores.push('El nombre es requerido.')
+  else if (!nombreRegex.test(nombre.toString().trim())) errores.push('El nombre solo debe contener letras y tener entre 2 y 60 caracteres.')
   if (!apellido || !apellido.toString().trim()) errores.push('El apellido es requerido.')
+  else if (!nombreRegex.test(apellido.toString().trim())) errores.push('El apellido solo debe contener letras y tener entre 2 y 60 caracteres.')
   if (!correo || !correo.toString().trim()) errores.push('El correo es requerido.')
   else if (!emailRegex.test(correo)) errores.push('El correo no tiene un formato válido.')
   if (!cedula || !cedula.toString().trim()) errores.push('La cédula es requerida.')
@@ -220,8 +223,14 @@ router.post('/register-app', async (req, res) => {
     if (!nombre || !String(nombre).trim()) {
       return res.status(400).json({ error: 'El nombre es requerido.' })
     }
+    if (!nombreRegex.test(String(nombre).trim())) {
+      return res.status(400).json({ error: 'El nombre solo debe contener letras y tener entre 2 y 60 caracteres.' })
+    }
     if (!apellido || !String(apellido).trim()) {
       return res.status(400).json({ error: 'El apellido es requerido.' })
+    }
+    if (!nombreRegex.test(String(apellido).trim())) {
+      return res.status(400).json({ error: 'El apellido solo debe contener letras y tener entre 2 y 60 caracteres.' })
     }
     if (!correo || !password || !cedula || !telefono) {
       return res.status(400).json({

@@ -37,6 +37,12 @@ const props = defineProps({
       return []
     },
   },
+  reportesEdan: {
+    type: Array,
+    default: function () {
+      return []
+    },
+  },
   centro: {
     type: Object,
     default: function () {
@@ -74,6 +80,44 @@ const busquedaError = ref(false)
 let map = null
 let layerGroup = null
 let capaMarcadorBusqueda = null
+let popupActivo = null
+let restaurandoMarcadores = false
+const marcadoresIndex = new Map()
+
+const OPCIONES_POPUP = {
+  autoClose: true,
+  closeOnClick: false,
+  autoPan: true,
+  keepInView: true,
+}
+
+function claveMarcador(tipo, id) {
+  return `${tipo}:${id}`
+}
+
+function cerrarPopupActivo() {
+  popupActivo = null
+  if (map) map.closePopup()
+}
+
+function registrarPopupMarcador(marker, tipo, id) {
+  const clave = claveMarcador(tipo, id)
+  marcadoresIndex.set(clave, marker)
+  marker.on('click', (e) => {
+    L.DomEvent.stopPropagation(e)
+    popupActivo = { tipo, id }
+  })
+}
+
+function restaurarPopupActivo() {
+  if (!popupActivo) return
+  const marker = marcadoresIndex.get(claveMarcador(popupActivo.tipo, popupActivo.id))
+  if (!marker) {
+    popupActivo = null
+    return
+  }
+  marker.openPopup()
+}
 
 function esColorClaro(hex) {
   const h = String(hex || '').trim().replace('#', '')
@@ -96,6 +140,17 @@ function crearIcono(incidente) {
     ';box-shadow:0 1px 2px rgba(0,0,0,0.28)"></span>'
   return L.divIcon({
     className: 'marker-incidente',
+    html: html,
+    iconSize: [12, 12],
+    iconAnchor: [6, 6],
+  })
+}
+
+function crearIconoEdan() {
+  const html =
+    '<span style="background:#FF69B4;width:12px;height:12px;border-radius:50%;display:block;border:1px solid white;box-shadow:0 1px 2px rgba(0,0,0,0.28)"></span>'
+  return L.divIcon({
+    className: 'marker-edan',
     html: html,
     iconSize: [12, 12],
     iconAnchor: [6, 6],
@@ -172,7 +227,9 @@ async function ejecutarBusqueda() {
 
 function actualizarMarcadores() {
   if (!map || !layerGroup) return
+  restaurandoMarcadores = true
   layerGroup.clearLayers()
+  marcadoresIndex.clear()
   const lista = props.incidentes
   for (let i = 0; i < lista.length; i++) {
     const inc = lista[i]
@@ -200,19 +257,54 @@ function actualizarMarcadores() {
       if (inc.via) {
         popupHtml += '<br>Vía: ' + escHtml(inc.via)
       }
-      marker.bindPopup(popupHtml)
+      marker.bindPopup(popupHtml, OPCIONES_POPUP)
+      if (inc.id != null) registrarPopupMarcador(marker, 'incidente', inc.id)
       layerGroup.addLayer(marker)
     }
   }
+
+  const edanLista = props.reportesEdan
+  for (let j = 0; j < edanLista.length; j++) {
+    const rep = edanLista[j]
+    const lat = Number(rep.lat)
+    const lng = Number(rep.lng)
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue
+    const marker = L.marker([lat, lng], { icon: crearIconoEdan() })
+    let fechaStr = '—'
+    let horaStr = '—'
+    if (rep.fecha_reporte) {
+      const d = new Date(rep.fecha_reporte)
+      fechaStr = d.toLocaleDateString('es-VE')
+      horaStr = d.toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' })
+    }
+    let popupHtml = '<strong>Reporte EDAN</strong><br>'
+    if (rep.sector) popupHtml += 'Sector: ' + escHtml(rep.sector) + '<br>'
+    if (rep.municipio) popupHtml += 'Municipio: ' + escHtml(rep.municipio) + '<br>'
+    if (rep.numero_planilla) popupHtml += 'Planilla: ' + escHtml(rep.numero_planilla) + '<br>'
+    popupHtml += 'Fecha: ' + fechaStr + '<br>'
+    popupHtml += 'Hora de registro: ' + horaStr
+    marker.bindPopup(popupHtml, OPCIONES_POPUP)
+    if (rep.id != null) registrarPopupMarcador(marker, 'edan', rep.id)
+    layerGroup.addLayer(marker)
+  }
+
+  restaurarPopupActivo()
+  restaurandoMarcadores = false
 }
 
 onMounted(function () {
   if (!mapContainer.value) return
-  map = L.map(mapContainer.value)
+  map = L.map(mapContainer.value, { closePopupOnClick: false })
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '© OpenStreetMap contributors',
   }).addTo(map)
   layerGroup = L.layerGroup().addTo(map)
+
+  map.on('click', cerrarPopupActivo)
+  map.on('popupclose', function () {
+    if (restaurandoMarcadores) return
+    popupActivo = null
+  })
 
   if (props.permitirClick) {
     map.on('click', function (e) {
@@ -236,6 +328,8 @@ onMounted(function () {
 
 onUnmounted(function () {
   quitarMarcadorBusqueda()
+  popupActivo = null
+  marcadoresIndex.clear()
   if (map) {
     map.remove()
     map = null
@@ -245,6 +339,14 @@ onUnmounted(function () {
 watch(
   function () {
     return props.incidentes
+  },
+  actualizarMarcadores,
+  { deep: true }
+)
+
+watch(
+  function () {
+    return props.reportesEdan
   },
   actualizarMarcadores,
   { deep: true }
@@ -261,10 +363,9 @@ watch(
 .mapa-buscar {
   position: absolute;
   z-index: 1000;
-  left: 50%;
-  transform: translateX(-50%);
-  top: 12px;
-  width: min(420px, calc(100% - 24px));
+  left: 12px;
+  top: 58px;
+  width: min(340px, calc(100% - 24px));
   pointer-events: none;
 }
 .mapa-buscar * {
@@ -344,8 +445,14 @@ watch(
   z-index: 500;
 }
 :deep(.marker-incidente),
+:deep(.marker-edan),
 :deep(.marker-busqueda) {
   background: transparent !important;
   border: none !important;
+}
+:deep(.leaflet-popup-content) {
+  margin: 10px 12px;
+  line-height: 1.45;
+  font-size: 0.88rem;
 }
 </style>
