@@ -1157,7 +1157,7 @@ async function descargarPdfEdan(row) {
   descargandoPdfEdanId.value = row.id
   try {
     const data = edanPreviewData.value?.id === row.id ? edanPreviewData.value : await cargarEdanCompleto(row.id)
-    descargarPdfEdanFormulario({
+    await descargarPdfEdanFormulario({
       data,
       logoDataUrl: logoPdfDataUrl.value,
     })
@@ -1169,11 +1169,11 @@ async function descargarPdfEdan(row) {
   }
 }
 
-function descargarPdfEdanDesdePreview() {
+async function descargarPdfEdanDesdePreview() {
   if (!edanPreviewData.value?.id) return
   descargandoPdfEdanId.value = edanPreviewData.value.id
   try {
-    descargarPdfEdanFormulario({
+    await descargarPdfEdanFormulario({
       data: edanPreviewData.value,
       logoDataUrl: logoPdfDataUrl.value,
     })

@@ -756,11 +756,11 @@ function cargarLogoPdfEdan() {
   })
 }
 
-function descargarPdfEdan() {
+async function descargarPdfEdan() {
   if (!edanUltimoRegistro.value) return
   descargandoPdfEdan.value = true
   try {
-    descargarPdfEdanFormulario({
+    await descargarPdfEdanFormulario({
       data: edanUltimoRegistro.value,
       logoDataUrl: logoPdfEdanDataUrl.value,
     })

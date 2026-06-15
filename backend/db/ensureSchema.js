@@ -1,5 +1,5 @@
 import pool from './connection.js'
-import { seedCatalogoVacio } from './seedCatalogoVacio.js'
+import { seedCatalogoVacio, syncNombresCatalogoSemilla } from './seedCatalogoVacio.js'
 
 async function hasTable(dbName, tableName) {
   const [rows] = await pool.query(
@@ -676,6 +676,7 @@ export async function ensureCatalogoEstructura() {
       }
     }
     await seedCatalogoVacio()
+    await syncNombresCatalogoSemilla()
   } catch (err) {
     console.error('[db] ensureCatalogoEstructura:', err.message)
     throw err

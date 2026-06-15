@@ -196,9 +196,6 @@ function validarCoordsCarabobo(lat, lng) {
 }
 
 function normalizarDetallesFamiliares(arr) {
-  if (!Array.isArray(arr) || arr.length === 0) {
-    throw new Error('Debe registrar al menos un afectado en el detalle familiar.')
-  }
   const out = []
   for (const it of arr) {
     const nombre = String(it?.nombre_completo || '').trim()
@@ -252,13 +249,16 @@ function validarYNormalizarPayload(d, { requiereIdOficial }) {
   const fecha_afectacion = fechaRequerida(d?.fecha_afectacion, 'fecha_afectacion')
   validarFechasEdan(fecha_solicitud, fecha_afectacion)
 
-  const numero_planilla = textoRequerido(d?.numero_planilla, 'numero_planilla', 50)
+  const numero_planilla = textoOpcional(d?.numero_planilla, 50) || `APP-${Date.now().toString().slice(-6)}`
   validarPatron(numero_planilla, 'numero_planilla', ALFANUM_GUION, 'Número de planilla solo admite letras, números y guion.')
-  const nro_informe = textoRequerido(d?.nro_informe, 'nro_informe', 50)
+  const nro_informe = textoOpcional(d?.nro_informe, 50) || `INF-${Date.now().toString().slice(-6)}`
   validarPatron(nro_informe, 'nro_informe', ALFANUM_GUION, 'Nro. informe solo admite letras, números y guion.')
   const propetario = textoRequerido(d?.propetario, 'propetario', 100)
   validarPatron(propetario, 'propetario', SOLO_LETRAS, 'Propietario solo permite letras.')
-  const p_cedula = normalizarCedula(textoRequerido(d?.p_cedula, 'p_cedula', 20), 'Cédula')
+  const p_cedula = textoRequerido(d?.p_cedula, 'p_cedula', 20)
+  if (!/^[VEJ]?\d{6,20}$/.test(p_cedula)) {
+    throw new Error('Cédula debe ser numérica y tener entre 6 y 20 dígitos.')
+  }
   const P_telefono = textoRequerido(d?.P_telefono, 'P_telefono', 20)
   validarPatron(P_telefono, 'P_telefono', TELEFONO_VENEZOLANO, 'Teléfono debe tener formato 0414-1234567.')
   const parroquia = textoRequerido(d?.parroquia, 'parroquia', 100)

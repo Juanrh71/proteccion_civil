@@ -7,6 +7,32 @@ function trunc100(s) {
 }
 
 /**
+ * Actualiza nombres oficiales (con tildes) en categorías y tipos ya existentes.
+ */
+export async function syncNombresCatalogoSemilla() {
+  for (const cat of CATEGORIAS_INICIO) {
+    try {
+      await pool.query(
+        'UPDATE categorias_incidentes SET nombre = ? WHERE slug = ?',
+        [cat.nombre, cat.slug]
+      )
+    } catch (e) {
+      console.warn('[db] sync categoría', cat.slug, e.message)
+    }
+  }
+  for (const tip of TIPOS_INICIO) {
+    try {
+      await pool.query(
+        'UPDATE tipos_de_incidentes SET nombre = ? WHERE slug = ?',
+        [trunc100(tip.nombre), tip.slug]
+      )
+    } catch (e) {
+      console.warn('[db] sync tipo', tip.slug, e.message)
+    }
+  }
+}
+
+/**
  * Sólo si tablas de catálogo están vacías: inserta categorías y tipos iniciales.
  */
 export async function seedCatalogoVacio() {

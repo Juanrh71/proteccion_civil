@@ -14,7 +14,6 @@ export const CATEGORIAS_INICIO = [
   { slug: 'colapso_estructura', nombre: 'Colapso de Estructura', color: '#374151', emergencia: 'Si', orden: 9 },
   { slug: 'inspeccion_reubicacion_animal', nombre: 'Inspección y Reubicación Animal', color: '#854d0e', emergencia: 'No', orden: 10 },
   { slug: 'eliminacion_peligro', nombre: 'Eliminación de Peligro', color: '#4c1d95', emergencia: 'Si', orden: 11 },
-  { slug: 'otro', nombre: 'Otro', color: '#334155', emergencia: 'No', orden: 99 },
 ]
 
 export const GRUPO_POR_TIPO = {
@@ -90,10 +89,8 @@ export const GRUPO_POR_TIPO = {
   animal_agreste: 'inspeccion_reubicacion_animal',
   fuga_de_glp: 'eliminacion_peligro',
   derrame_de_hidrocarburo: 'eliminacion_peligro',
-  otro: 'otro',
 }
 
-/** { slug, nombre } — categoria = GRUPO_POR_TIPO[slug] o 'otro' */
 export const TIPOS_INICIO = [
   { slug: 'arrollado_peaton', nombre: 'Arrollado (Peatón)' },
   { slug: 'colision_vehiculo_moto_arrollado', nombre: 'Colisión Vehículo - Moto (Arrollado)' },
@@ -104,7 +101,7 @@ export const TIPOS_INICIO = [
   { slug: 'choque_contra_objeto_fijo', nombre: 'Choque contra Objeto Fijo' },
   { slug: 'encunetamiento', nombre: 'Encunetamiento' },
   { slug: 'colision_con_unidad_colectiva_involucrada', nombre: 'Colisión con Unidad Colectiva involucrada' },
-  { slug: 'perdida_de_carga', nombre: 'Perdida de Carga' },
+  { slug: 'perdida_de_carga', nombre: 'Pérdida de Carga' },
   { slug: 'colision_con_vehiculo_de_carga_involucrado', nombre: 'Colisión con Vehículo de Carga involucrado' },
   { slug: 'volcamiento_de_carga', nombre: 'Volcamiento de Carga' },
   { slug: 'colision_entre_vehiculos', nombre: 'Colisión entre Vehículos' },
@@ -167,5 +164,4 @@ export const TIPOS_INICIO = [
   { slug: 'animal_agreste', nombre: 'Animal agreste' },
   { slug: 'fuga_de_glp', nombre: 'Fuga de GLP' },
   { slug: 'derrame_de_hidrocarburo', nombre: 'Derrame de hidrocarburo' },
-  { slug: 'otro', nombre: 'Otro' },
 ]
