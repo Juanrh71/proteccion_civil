@@ -320,29 +320,59 @@
             <div class="form-group">
               <label>Desde (mes)</label>
               <select v-model.number="indMesDesde" class="input">
-                <option v-for="(mes, idx) in MESES" :key="`md-${idx}`" :value="idx + 1">{{ mes }}</option>
+                <option
+                  v-for="opt in mesesDesdeOpcionesInd"
+                  :key="`md-${opt.num}`"
+                  :value="opt.num"
+                >
+                  {{ opt.mes }}
+                </option>
               </select>
             </div>
             <div class="form-group">
               <label>Hasta (mes)</label>
               <select v-model.number="indMesHasta" class="input">
-                <option v-for="(mes, idx) in MESES" :key="`mh-${idx}`" :value="idx + 1">{{ mes }}</option>
+                <option
+                  v-for="opt in mesesHastaOpcionesInd"
+                  :key="`mh-${opt.num}`"
+                  :value="opt.num"
+                >
+                  {{ opt.mes }}
+                </option>
               </select>
             </div>
+            <p v-if="errorRangoMesesInd" class="reportes-error ind-rango-error" role="alert">
+              {{ errorRangoMesesInd }}
+            </p>
           </template>
           <template v-else>
             <div class="form-group">
               <label>Año desde</label>
               <select v-model.number="indAnioDesde" class="input">
-                <option v-for="y in aniosDisponiblesComparativa" :key="`yd-${y}`" :value="y">{{ y }}</option>
+                <option
+                  v-for="y in aniosDesdeOpcionesInd"
+                  :key="`yd-${y}`"
+                  :value="y"
+                >
+                  {{ y }}
+                </option>
               </select>
             </div>
             <div class="form-group">
               <label>Año hasta</label>
               <select v-model.number="indAnioHasta" class="input">
-                <option v-for="y in aniosDisponiblesComparativa" :key="`yh-${y}`" :value="y">{{ y }}</option>
+                <option
+                  v-for="y in aniosHastaOpcionesInd"
+                  :key="`yh-${y}`"
+                  :value="y"
+                >
+                  {{ y }}
+                </option>
               </select>
             </div>
+            <p v-if="errorRangoAniosInd" class="reportes-error ind-rango-error" role="alert">
+              {{ errorRangoAniosInd }}
+            </p>
           </template>
         </div>
         <p class="filtro-resumen">{{ etiquetaResumenIndicadores }}</p>
@@ -748,11 +778,11 @@ function getRangoIndicadores() {
     return { inicio: new Date(y1, 0, 1), fin: new Date(y2, 11, 30, 23, 59, 59) }
   }
   const y = indAnioRef.value
-  const m1 = indMesDesde.value
-  const m2 = indMesHasta.value
+  const mDesde = Math.min(indMesDesde.value, indMesHasta.value)
+  const mHasta = Math.max(indMesDesde.value, indMesHasta.value)
   return {
-    inicio: new Date(y, m1 - 1, 1),
-    fin: new Date(y, m2, 0, 23, 59, 59, 999),
+    inicio: new Date(y, mDesde - 1, 1),
+    fin: new Date(y, mHasta, 0, 23, 59, 59, 999),
   }
 }
 
@@ -967,11 +997,15 @@ const etiquetaResumenIndicadores = computed(() => {
     parts.push(`Vía: "${indFiltroVia.value}"`)
   }
   if (indModoComparacion.value === 'entre_anios') {
-    parts.push(`Comparativa entre años ${indAnioDesde.value} – ${indAnioHasta.value}`)
+    const yDesde = Math.min(indAnioDesde.value, indAnioHasta.value)
+    const yHasta = Math.max(indAnioDesde.value, indAnioHasta.value)
+    parts.push(`Comparativa entre años ${yDesde} – ${yHasta}`)
   } else {
     const g = PERIODOS_MISMO_ANIO.find((p) => p.id === indGranularidad.value)
+    const mDesde = Math.min(indMesDesde.value, indMesHasta.value)
+    const mHasta = Math.max(indMesDesde.value, indMesHasta.value)
     parts.push(
-      `${g?.label || 'Período'} ${indAnioRef.value} · ${MESES[indMesDesde.value - 1]} – ${MESES[indMesHasta.value - 1]}`
+      `${g?.label || 'Período'} ${indAnioRef.value} · ${MESES[mDesde - 1]} – ${MESES[mHasta - 1]}`
     )
   }
   parts.push(`${incidentesIndicadoresEnRango.value.length} incidente(s) en el rango`)
@@ -1003,7 +1037,9 @@ const chartEvolucionInd = computed(() => {
 
 const tituloEvolucionInd = computed(() => {
   if (indModoComparacion.value === 'entre_anios') {
-    return `Comparativa entre años (${indAnioDesde.value} – ${indAnioHasta.value})`
+    const yDesde = Math.min(indAnioDesde.value, indAnioHasta.value)
+    const yHasta = Math.max(indAnioDesde.value, indAnioHasta.value)
+    return `Comparativa entre años (${yDesde} – ${yHasta})`
   }
   const g = PERIODOS_MISMO_ANIO.find((p) => p.id === indGranularidad.value)
   return `Evolución ${g?.label?.toLowerCase() || ''} · año ${indAnioRef.value}`
@@ -1049,15 +1085,64 @@ const tablaTiposInd = computed(() => {
   return agruparCategoriasTipos(incidentesIndicadoresEnRango.value).filasTipo
 })
 
-watch(indModoComparacion, (modo) => {
-  if (modo === 'entre_anios') return
-  if (indAnioDesde.value > indAnioHasta.value) {
-    indAnioHasta.value = indAnioDesde.value
+const mesesDesdeOpcionesInd = computed(() =>
+  MESES.map((mes, idx) => ({ mes, num: idx + 1 })).filter((opt) => opt.num <= indMesHasta.value)
+)
+
+const mesesHastaOpcionesInd = computed(() =>
+  MESES.map((mes, idx) => ({ mes, num: idx + 1 })).filter((opt) => opt.num >= indMesDesde.value)
+)
+
+const aniosDesdeOpcionesInd = computed(() =>
+  aniosDisponiblesComparativa.value.filter((y) => y <= indAnioHasta.value)
+)
+
+const aniosHastaOpcionesInd = computed(() =>
+  aniosDisponiblesComparativa.value.filter((y) => y >= indAnioDesde.value)
+)
+
+const errorRangoMesesInd = computed(() => {
+  if (indModoComparacion.value !== 'mismo_anio') return ''
+  if (indMesDesde.value > indMesHasta.value) {
+    return 'El mes «Desde» no puede ser posterior al mes «Hasta» (por ejemplo, Diciembre → Enero).'
   }
+  return ''
 })
 
-watch([indMesDesde, indMesHasta], () => {
+const errorRangoAniosInd = computed(() => {
+  if (indModoComparacion.value !== 'entre_anios') return ''
+  if (indAnioDesde.value > indAnioHasta.value) {
+    return 'El año «Desde» no puede ser posterior al año «Hasta».'
+  }
+  return ''
+})
+
+watch(indModoComparacion, (modo) => {
+  if (modo === 'entre_anios') {
+    if (indAnioDesde.value > indAnioHasta.value) indAnioHasta.value = indAnioDesde.value
+    return
+  }
   if (indMesDesde.value > indMesHasta.value) indMesHasta.value = indMesDesde.value
+})
+
+watch(indMesDesde, (nuevo) => {
+  if (indModoComparacion.value !== 'mismo_anio') return
+  if (nuevo > indMesHasta.value) indMesHasta.value = nuevo
+})
+
+watch(indMesHasta, (nuevo) => {
+  if (indModoComparacion.value !== 'mismo_anio') return
+  if (nuevo < indMesDesde.value) indMesDesde.value = nuevo
+})
+
+watch(indAnioDesde, (nuevo) => {
+  if (indModoComparacion.value !== 'entre_anios') return
+  if (nuevo > indAnioHasta.value) indAnioHasta.value = nuevo
+})
+
+watch(indAnioHasta, (nuevo) => {
+  if (indModoComparacion.value !== 'entre_anios') return
+  if (nuevo < indAnioDesde.value) indAnioDesde.value = nuevo
 })
 
 const chartEvolucionOptions = {
@@ -1495,6 +1580,11 @@ onMounted(async () => {
   margin: 0.85rem 0 0;
   font-size: 0.9rem;
   color: var(--color-text-muted);
+}
+
+.ind-rango-error {
+  flex: 1 1 100%;
+  margin: 0.35rem 0 0;
 }
 
 .selector-grid {

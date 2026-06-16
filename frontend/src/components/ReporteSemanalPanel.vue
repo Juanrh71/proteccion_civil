@@ -9,14 +9,6 @@
             <option v-for="y in aniosOpciones" :key="`rs-y-${y}`" :value="y">{{ y }}</option>
           </select>
         </div>
-        <div class="form-group">
-          <label>Semana de portada (título)</label>
-          <select v-model.number="semanaPortada" class="input">
-            <option v-for="w in semanasSeleccionadasOrdenadas" :key="`sp-${w}`" :value="w">
-              Semana {{ w }}
-            </option>
-          </select>
-        </div>
       </div>
 
       <p class="rs-label-semanas">Seleccione semanas a comparar (mínimo 2)</p>
@@ -43,7 +35,7 @@
     <section v-if="datosReporte.portada" class="card portada-preview">
       <p class="portada-inst">{{ datosReporte.portada.institucion }}</p>
       <h2 class="portada-titulo">{{ datosReporte.portada.titulo }}</h2>
-      <p class="portada-sub">{{ etiquetaPortadaSemana(anioSemanal, semanaPortada) }}</p>
+      <p class="portada-sub">{{ datosReporte.portada.subtitulo }}</p>
     </section>
 
     <section
@@ -98,7 +90,6 @@
 import { ref, computed, watch } from 'vue'
 import {
   construirDatosReporteSemanal,
-  etiquetaPortadaSemana,
   formatoPorcentaje,
   semanasConDatos,
 } from '../utils/reporteSemanal.js'
@@ -112,7 +103,6 @@ const props = defineProps({
 
 const anioSemanal = ref(añoSugeridoParaIncidentes())
 const semanasSeleccionadas = ref([])
-const semanaPortada = ref(null)
 const descargandoPdf = ref(false)
 
 const aniosOpciones = computed(() => {
@@ -152,40 +142,16 @@ const datosReporte = computed(() => {
   if (!puedeGenerarPdf.value) {
     return { semanas: [], portada: null, secciones: [] }
   }
-  const semanas = semanasSeleccionadasOrdenadas.value
-  const datos = construirDatosReporteSemanal(props.incidentes, anioSemanal.value, semanas)
-  if (semanaPortada.value && datos.portada) {
-    datos.portada.subtitulo = etiquetaPortadaSemana(anioSemanal.value, semanaPortada.value)
-  }
-  return datos
+  return construirDatosReporteSemanal(
+    props.incidentes,
+    anioSemanal.value,
+    semanasSeleccionadasOrdenadas.value
+  )
 })
-
-watch(
-  semanasSeleccionadasOrdenadas,
-  (list) => {
-    if (list.length && !list.includes(semanaPortada.value)) {
-      semanaPortada.value = list[list.length - 1]
-    }
-  },
-  { immediate: true }
-)
 
 watch(anioSemanal, () => {
   semanasSeleccionadas.value = []
 })
-
-watch(
-  semanasConIncidentes,
-  (list) => {
-    if (semanasSeleccionadas.value.length >= 2) return
-    if (list.length >= 2) {
-      semanasSeleccionadas.value = list.slice(-2)
-    } else if (list.length === 1) {
-      semanasSeleccionadas.value = [list[0]]
-    }
-  },
-  { immediate: true }
-)
 
 function toggleSemana(w) {
   if (semanasSeleccionadas.value.includes(w)) {
